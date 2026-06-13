@@ -162,24 +162,30 @@ Datum: ${formatDate(todayISO())}`,
   }
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push("/")}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-          aria-label="Terug naar dashboard"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
-        <nav className="text-sm text-gray-400">
-          <a href="/" className="hover:text-gray-600">Dashboard</a>
-          <span className="mx-2">/</span>
-          <span className="text-gray-700 font-medium">{zaak.zaaknummer}</span>
-        </nav>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Minimal header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push("/")} className="flex items-center gap-2 text-gray-400 hover:text-gray-700 transition-colors">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                <path fillRule="evenodd" d="M7.707 13.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L4.414 7H14a1 1 0 110 2H4.414l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd"/>
+              </svg>
+            </button>
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white">
+                  <path d="M2 3h12v2H2V3zm0 4h8v2H2V7zm0 4h10v2H2v-2z" fill="currentColor"/>
+                </svg>
+              </div>
+              <span className="font-semibold text-gray-900 text-sm">BezwaarPilot</span>
+            </a>
+            <span className="text-gray-300">/</span>
+            <span className="text-sm text-gray-600 font-medium">{zaak.zaaknummer}</span>
+          </div>
+        </div>
+      </header>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
       {/* Status header card */}
       <div className="card p-6">
@@ -340,6 +346,7 @@ Datum: ${formatDate(todayISO())}`,
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
