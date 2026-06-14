@@ -96,11 +96,8 @@ function NieuweZaakForm() {
             </svg>
           </button>
           <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white">
-                <path d="M2 3h12v2H2V3zm0 4h8v2H2V7zm0 4h10v2H2v-2z" fill="currentColor"/>
-              </svg>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="BezwaarPilot" className="w-6 h-6 rounded-md object-cover" />
             <span className="font-semibold text-gray-900 text-sm">BezwaarPilot</span>
           </a>
           <span className="text-gray-300">/</span>

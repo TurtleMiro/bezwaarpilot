@@ -88,11 +88,8 @@ function DashboardContent() {
 
         {/* Logo */}
         <div className="flex items-center px-4 gap-2.5 border-r border-gray-100 flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white">
-              <path d="M2 3h12v2H2V3zm0 4h8v2H2V7zm0 4h10v2H2v-2z" fill="currentColor" />
-            </svg>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="BezwaarPilot" className="w-7 h-7 rounded-md object-cover" />
           <span className="font-semibold text-gray-900 text-sm tracking-tight">BezwaarPilot</span>
         </div>
 
