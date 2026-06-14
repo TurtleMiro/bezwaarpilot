@@ -34,10 +34,16 @@ function daysUntil(dateStr: string): number | null {
 function DashboardContent() {
   const { cases, updateCase } = useCases();
   const router = useRouter();
-  const [search, setSearch]       = useState("");
-  const [faseFilter, setFaseFilter] = useState("Alle");
+  const [search, setSearch]           = useState("");
+  const [faseFilter, setFaseFilter]   = useState("Alle");
   const [quickFilter, setQuickFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId]   = useState<string | null>(null);
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
+
+  function selectCase(id: string) {
+    setSelectedId(id);
+    setMobileShowDetail(true);
+  }
 
   const selectedCase = selectedId ? (cases.find((c) => c.id === selectedId) ?? null) : null;
 
@@ -81,7 +87,7 @@ function DashboardContent() {
       <header className="flex items-stretch bg-white border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] z-20 flex-shrink-0 h-[58px]">
 
         {/* Logo */}
-        <div className="flex items-center px-5 gap-3 border-r border-gray-100 w-[232px] flex-shrink-0">
+        <div className="flex items-center px-4 gap-2.5 border-r border-gray-100 flex-shrink-0">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white">
               <path d="M2 3h12v2H2V3zm0 4h8v2H2V7zm0 4h10v2H2v-2z" fill="currentColor" />
@@ -90,15 +96,15 @@ function DashboardContent() {
           <span className="font-semibold text-gray-900 text-sm tracking-tight">BezwaarPilot</span>
         </div>
 
-        {/* Phase tabs */}
-        <div className="flex flex-1 overflow-x-auto px-2 gap-1 items-center">
+        {/* Phase tabs — hidden on mobile */}
+        <div className="hidden md:flex flex-1 overflow-x-auto px-2 gap-1 items-center">
           {FASE_TABS.map((tab) => {
             const active = faseFilter === tab.key;
             const count  = faseCounts[tab.key] ?? 0;
             return (
               <button
                 key={tab.key}
-                onClick={() => { setFaseFilter(tab.key); setQuickFilter(null); }}
+                onClick={() => { setFaseFilter(tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 whitespace-nowrap ${
                   active
                     ? `${tab.activePill} shadow-sm ring-1 ring-inset ring-black/5`
@@ -113,6 +119,9 @@ function DashboardContent() {
             );
           })}
         </div>
+
+        {/* Mobile: spacer */}
+        <div className="flex md:hidden flex-1" />
 
         {/* Right actions */}
         <div className="flex items-center px-4 gap-2 border-l border-gray-100">
@@ -129,8 +138,10 @@ function DashboardContent() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar ────────────────────────────────────────────────── */}
-        <aside className="w-[232px] border-r border-gray-100 flex flex-col flex-shrink-0 bg-white">
+        {/* ── Sidebar — full screen on mobile list view, fixed width on desktop ── */}
+        <aside className={`border-r border-gray-100 flex-col flex-shrink-0 bg-white
+          ${mobileShowDetail ? "hidden" : "flex w-full"}
+          md:flex md:w-[232px]`}>
 
           {/* Search + new */}
           <div className="px-3 pt-3 pb-2">
@@ -205,7 +216,7 @@ function DashboardContent() {
               return (
                 <button
                   key={c.id}
-                  onClick={() => setSelectedId(c.id)}
+                  onClick={() => selectCase(c.id)}
                   className={`w-full text-left px-3 py-3 border-b border-gray-50 transition-all duration-150 relative group ${
                     active ? "bg-blue-50" : "hover:bg-gray-50/80"
                   }`}
@@ -250,15 +261,39 @@ function DashboardContent() {
               </button>
             )}
           </div>
+
+          {/* Mobile: fase filter pills */}
+          <div className="md:hidden flex gap-1.5 px-3 py-2.5 overflow-x-auto border-t border-gray-100 flex-shrink-0" style={{ scrollbarWidth: "none" }}>
+            {FASE_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => { setFaseFilter(tab.key === faseFilter ? "Alle" : tab.key); setQuickFilter(null); }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                  faseFilter === tab.key
+                    ? `${tab.activePill} ring-1 ring-inset ring-black/5`
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                <span className={`w-4 h-4 rounded-full ${tab.bg} text-white text-[9px] font-bold flex items-center justify-center`}>
+                  {faseCounts[tab.key] ?? 0}
+                </span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </aside>
 
-        {/* ── Main panel ─────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
+        {/* ── Main panel — hidden on mobile list view ─────────────────── */}
+        <main
+          className={`flex-1 overflow-y-auto ${mobileShowDetail ? "flex flex-col" : "hidden"} md:flex md:flex-col`}
+          style={{ background: "var(--bg)" }}
+        >
           {selectedCase ? (
             <CaseDetailPanel
               key={selectedCase.id}
               zaak={selectedCase}
               onUpdate={(updates) => updateCase({ ...selectedCase, ...updates })}
+              onBack={() => setMobileShowDetail(false)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -334,7 +369,7 @@ const FASE_UITLEG: Record<string, { steps: string[]; tip: string }> = {
   },
 };
 
-function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; onUpdate: (u: Partial<Case>) => void; onBack?: () => void }) {
   const { updateCase } = useCases();
   const [zaak, setZaak]                         = useState<Case>(initialZaak);
   const [saved, setSaved]                       = useState(false);
@@ -438,6 +473,17 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
         {/* Case title row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3 flex-wrap min-w-0">
+            {/* Mobile back button */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0"
+              >
+                <svg className="w-4 h-4 text-gray-600" viewBox="0 0 16 16" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.707 13.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L4.414 7H14a1 1 0 110 2H4.414l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd"/>
+                </svg>
+              </button>
+            )}
             <h1 className="text-base font-bold text-gray-900 tracking-tight">{zaak.zaaknummer}</h1>
             <span className="text-sm text-gray-400 font-medium">{zaak.bezwaarmaker}</span>
             {zaak.status && (
@@ -458,7 +504,9 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
         </div>
 
         {/* Phase progress */}
-        <div className="flex items-center gap-0">
+        <div className="flex items-center gap-0 overflow-x-auto pb-1 -mb-1"
+          style={{ scrollbarWidth: "none" }}
+        >
           {FASE_STEPS.map((fase, i) => {
             const done    = i < faseIndex;
             const current = i === faseIndex;
@@ -497,13 +545,13 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
       </div>
 
       {/* ── Content grid ───────────────────────────────────────────── */}
-      <div className="p-5 grid grid-cols-3 gap-4">
+      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
 
         {/* Left 2 cols */}
-        <div className="col-span-2 space-y-4">
+        <div className="col-span-1 md:col-span-2 space-y-4">
 
           {/* Fase + timer card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 grid grid-cols-2 gap-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
             {/* Huidige fase */}
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Huidige fase</p>
@@ -547,7 +595,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Beslistermijn */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 relative overflow-hidden">
@@ -633,7 +681,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
             </button>
             {showZaakgegevens && (
               <div className="px-5 pb-5 border-t border-gray-50">
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                   <EditableField label="Zaaknummer"           value={zaak.zaaknummer}         onChange={(v) => handleFieldChange("zaaknummer", v)} />
                   <EditableField label="Bezwaarmaker"         value={zaak.bezwaarmaker}        onChange={(v) => handleFieldChange("bezwaarmaker", v)} />
                   <EditableField label="Datum ontvangst"      value={zaak.datumOntvangst}      type="date" onChange={(v) => handleFieldChange("datumOntvangst", v)} />
