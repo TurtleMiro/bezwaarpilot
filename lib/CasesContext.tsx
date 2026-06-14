@@ -8,6 +8,7 @@ interface CasesContextValue {
   cases: Case[];
   updateCase: (updated: Case) => void;
   addCase: (newCase: Case) => void;
+  deleteCase: (id: string) => void;
   refresh: () => void;
 }
 
@@ -40,8 +41,16 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const deleteCase = useCallback((id: string) => {
+    setCases((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveCases(next);
+      return next;
+    });
+  }, []);
+
   return (
-    <CasesContext.Provider value={{ cases, updateCase, addCase, refresh }}>
+    <CasesContext.Provider value={{ cases, updateCase, addCase, deleteCase, refresh }}>
       {children}
     </CasesContext.Provider>
   );

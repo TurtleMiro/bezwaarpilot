@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
 import { formatDate, isOverdue, isDueSoon, todayISO, addWeeks } from "@/lib/dateUtils";
+import { generateId } from "@/lib/store";
 
 const FASE_ICONS: Record<string, JSX.Element> = {
   Intake:      <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />,
@@ -49,7 +50,7 @@ function daysUntil(dateStr: string): number | null {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function DashboardContent() {
-  const { cases, updateCase } = useCases();
+  const { cases, updateCase, addCase, deleteCase } = useCases();
   const router = useRouter();
   const [search, setSearch]         = useState("");
   const [faseFilter, setFaseFilter] = useState("Alle");
@@ -296,6 +297,12 @@ function DashboardContent() {
               zaak={selectedCase}
               onUpdate={(updates) => handleUpdate(selectedCase, updates)}
               onBack={() => setMobileShowDetail(false)}
+              onDelete={(id) => { deleteCase(id); setSelectedId(null); setMobileShowDetail(false); }}
+              onDuplicate={(zaak) => {
+                const copy = { ...zaak, id: generateId(), zaaknummer: zaak.zaaknummer + "-KOPIE" };
+                addCase(copy);
+                setSelectedId(copy.id);
+              }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -326,13 +333,34 @@ function DashboardContent() {
 
 // ─── Case detail panel (center) ───────────────────────────────────────────────
 
-function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; onUpdate: (u: Partial<Case>) => void; onBack?: () => void }) {
+function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDuplicate }: {
+  zaak: Case;
+  onUpdate: (u: Partial<Case>) => void;
+  onBack?: () => void;
+  onDelete?: (id: string) => void;
+  onDuplicate?: (zaak: Case) => void;
+}) {
   const { updateCase } = useCases();
-  const [zaak, setZaak]                         = useState<Case>(initialZaak);
-  const [saved, setSaved]                       = useState(false);
-  const [showZaakgegevens, setShowZaakgegevens] = useState(false);
+  const [zaak, setZaak]                           = useState<Case>(initialZaak);
+  const [saved, setSaved]                         = useState(false);
+  const [showZaakgegevens, setShowZaakgegevens]   = useState(false);
+  const [showMeerActies, setShowMeerActies]       = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFaseModal, setShowFaseModal]         = useState(false);
+  const [showExportModal, setShowExportModal]     = useState(false);
+  const [copied, setCopied]                       = useState(false);
+  const meerActiesRef                             = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setZaak(initialZaak); setShowZaakgegevens(false); }, [initialZaak.id]); // eslint-disable-line
+  useEffect(() => { setZaak(initialZaak); setShowZaakgegevens(false); setShowMeerActies(false); }, [initialZaak.id]); // eslint-disable-line
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (meerActiesRef.current && !meerActiesRef.current.contains(e.target as Node))
+        setShowMeerActies(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   function applyWorkflow(updates: Partial<Case>) {
     const updated = { ...zaak, ...updates };
@@ -366,6 +394,33 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
     onUpdate(zaak);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  function buildExportText() {
+    return [
+      `BezwaarPilot — Zaakexport`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `Zaaknummer:      ${zaak.zaaknummer}`,
+      `Bezwaarmaker:    ${zaak.bezwaarmaker}`,
+      `Fase:            ${zaak.fase}`,
+      `Status:          ${zaak.status || "—"}`,
+      ``,
+      `Datum ontvangst: ${formatDate(zaak.datumOntvangst) || "—"}`,
+      `Datum besluit:   ${formatDate(zaak.datumBesluit) || "—"}`,
+      `Beslistermijn:   ${formatDate(zaak.beslistermijn12Weken) || "—"}`,
+      `Actiedatum:      ${formatDate(zaak.actiedatum) || "—"}`,
+      `Hoorzitting:     ${formatDate(zaak.datumHoorzitting) || "—"}`,
+      ``,
+      `Volgende actie:  ${zaak.volgendeActie || "—"}`,
+      zaak.aantekeningen ? `\nAantekeningen:\n${zaak.aantekeningen}` : "",
+    ].filter((l) => l !== undefined).join("\n");
+  }
+
+  function handleCopyExport() {
+    navigator.clipboard.writeText(buildExportText()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   const faseIndex           = FASE_STEPS.indexOf(zaak.fase);
@@ -407,12 +462,59 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
             </div>
             <p className="text-sm text-gray-500 mt-0.5">{zaak.bezwaarmaker}</p>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium whitespace-nowrap ml-3 flex-shrink-0 shadow-sm">
-            Meer acties
-            <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 14 14" fill="none">
-              <path d="M3.5 6l3.5 3.5L10.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          {/* Meer acties dropdown */}
+          <div className="relative ml-3 flex-shrink-0" ref={meerActiesRef}>
+            <button
+              onClick={() => setShowMeerActies(!showMeerActies)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium whitespace-nowrap shadow-sm"
+            >
+              Meer acties
+              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showMeerActies ? "rotate-180" : ""}`} viewBox="0 0 14 14" fill="none">
+                <path d="M3.5 6l3.5 3.5L10.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            {showMeerActies && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-gray-200 shadow-lg z-30 py-1 overflow-hidden">
+                <button
+                  onClick={() => { setShowFaseModal(true); setShowMeerActies(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Fase handmatig wijzigen
+                </button>
+                <button
+                  onClick={() => { onDuplicate?.(zaak); setShowMeerActies(false); setSaved(true); setTimeout(() => setSaved(false), 2500); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" /><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
+                  </svg>
+                  Zaak dupliceren
+                </button>
+                <button
+                  onClick={() => { setShowExportModal(true); setShowMeerActies(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Zaak exporteren
+                </button>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={() => { setShowDeleteConfirm(true); setShowMeerActies(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-red-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Zaak verwijderen
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Phase stepper */}
@@ -604,6 +706,111 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
           )}
         </div>
       </div>
+
+      {/* ── Delete confirmation modal ─────────────────────────────── */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <svg className="w-5 h-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h2 className="text-sm font-bold text-gray-900 mb-1">Zaak verwijderen?</h2>
+            <p className="text-xs text-gray-500 mb-5 leading-relaxed">
+              <span className="font-semibold">{zaak.zaaknummer}</span> — {zaak.bezwaarmaker} wordt permanent verwijderd. Dit kan niet ongedaan worden gemaakt.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { onDelete?.(zaak.id); setShowDeleteConfirm(false); }}
+                className="flex-1 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
+              >
+                Ja, verwijderen
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Fase modal ────────────────────────────────────────────── */}
+      {showFaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} onClick={() => setShowFaseModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-bold text-gray-900 mb-1">Fase handmatig wijzigen</h2>
+            <p className="text-xs text-gray-400 mb-4">Huidige fase: <span className="font-semibold text-gray-700">{zaak.fase}</span></p>
+            <div className="space-y-1.5">
+              {FASE_STEPS.map((fase) => {
+                const color = FASE_COLORS[fase];
+                const active = zaak.fase === fase;
+                return (
+                  <button
+                    key={fase}
+                    onClick={() => {
+                      applyWorkflow({ fase } as Partial<Case>);
+                      setShowFaseModal(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left ${
+                      active
+                        ? `${color.light} ${color.text} ${color.border}`
+                        : "border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <svg className={`w-4 h-4 flex-shrink-0 ${active ? color.text : "text-gray-400"}`} viewBox="0 0 20 20" fill="currentColor">
+                      {FASE_ICONS[fase]}
+                    </svg>
+                    {fase}
+                    {active && <span className="ml-auto text-xs font-semibold opacity-60">huidig</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setShowFaseModal(false)} className="mt-4 w-full py-2 rounded-xl border border-gray-200 text-gray-500 text-xs font-medium hover:bg-gray-50 transition-colors">
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Export modal ──────────────────────────────────────────── */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-gray-900">Zaak exporteren</h2>
+              <button onClick={() => setShowExportModal(false)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <pre className="text-[11px] text-gray-600 bg-gray-50 rounded-xl p-4 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border border-gray-100">
+              {buildExportText()}
+            </pre>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleCopyExport}
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+                  copied ? "bg-emerald-600 text-white" : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {copied ? "✓ Gekopieerd!" : "Kopieer naar klembord"}
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Afdrukken
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
