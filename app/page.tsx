@@ -7,21 +7,30 @@ import { Case } from "@/lib/types";
 import { formatDate, isOverdue, isDueSoon, todayISO, addWeeks } from "@/lib/dateUtils";
 
 const FASE_TABS = [
-  { key: "Intake",      label: "Intake",                bg: "bg-blue-500",   activePill: "bg-blue-50 text-blue-700",   dot: "bg-blue-500"   },
-  { key: "Informeel",  label: "Informele afhandeling", bg: "bg-orange-500", activePill: "bg-orange-50 text-orange-700", dot: "bg-orange-500" },
-  { key: "Hoorzitting",label: "Hoorzitting",           bg: "bg-purple-500", activePill: "bg-purple-50 text-purple-700", dot: "bg-purple-500" },
-  { key: "Advies",     label: "Advies",                bg: "bg-red-500",    activePill: "bg-red-50 text-red-700",      dot: "bg-red-500"    },
-  { key: "Afronding",  label: "Afronding",             bg: "bg-emerald-600",activePill: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  { key: "Intake",       label: "Intake",       bg: "bg-blue-500",    pill: "bg-blue-600 text-white"    },
+  { key: "Informeel",   label: "Informeel",    bg: "bg-orange-500",  pill: "bg-orange-500 text-white"  },
+  { key: "Hoorzitting", label: "Hoorzitting",  bg: "bg-purple-500",  pill: "bg-purple-600 text-white"  },
+  { key: "Advies",      label: "Advies",       bg: "bg-emerald-500", pill: "bg-emerald-600 text-white" },
+  { key: "Afronding",   label: "Afronding",    bg: "bg-slate-500",   pill: "bg-slate-600 text-white"   },
 ];
 
 const FASE_STEPS = ["Intake", "Informeel", "Hoorzitting", "Advies", "Afronding"];
 
-const FASE_COLORS: Record<string, { ring: string; text: string; bg: string }> = {
-  Intake:      { ring: "ring-blue-200",   text: "text-blue-600",   bg: "bg-blue-500"    },
-  Informeel:   { ring: "ring-orange-200", text: "text-orange-600", bg: "bg-orange-500"  },
-  Hoorzitting: { ring: "ring-purple-200", text: "text-purple-600", bg: "bg-purple-500"  },
-  Advies:      { ring: "ring-red-200",    text: "text-red-600",    bg: "bg-red-500"     },
-  Afronding:   { ring: "ring-emerald-200",text: "text-emerald-600",bg: "bg-emerald-600" },
+const FASE_COLORS: Record<string, { ring: string; text: string; bg: string; light: string; border: string }> = {
+  Intake:      { ring: "ring-blue-200",    text: "text-blue-700",    bg: "bg-blue-500",    light: "bg-blue-50",    border: "border-blue-200"    },
+  Informeel:   { ring: "ring-orange-200",  text: "text-orange-700",  bg: "bg-orange-500",  light: "bg-orange-50",  border: "border-orange-200"  },
+  Hoorzitting: { ring: "ring-purple-200",  text: "text-purple-700",  bg: "bg-purple-500",  light: "bg-purple-50",  border: "border-purple-200"  },
+  Advies:      { ring: "ring-emerald-200", text: "text-emerald-700", bg: "bg-emerald-500", light: "bg-emerald-50", border: "border-emerald-200" },
+  Afronding:   { ring: "ring-slate-200",   text: "text-slate-700",   bg: "bg-slate-500",   light: "bg-slate-50",   border: "border-slate-200"   },
+};
+
+const FASE_UITLEG: Record<string, { steps: string[]; tip: string }> = {
+  Intake:      { steps: ["Controleer of het bezwaar tijdig en volledig is ingediend.", "Stuur een ontvangstbevestiging aan de bezwaarmaker.", "Is het bezwaar onvolledig? Stuur een herstelverzuimbrief.", "Ontvang het herstel en ga door naar de informele fase."], tip: "De bezwaartermijn is 6 weken na de besluitdatum. Controleer dit altijd als eerste." },
+  Informeel:   { steps: ["Neem contact op met de vakafdeling voor een informele reactie.", "Stuur zo nodig een reminder als er geen reactie komt.", "Beoordeel de reactie van de vakafdeling.", "Geslaagd? Sluit informeel af. Niet geslaagd? Plan een zitting."], tip: "Informele afhandeling bespaart tijd voor alle partijen. Probeer dit altijd eerst." },
+  Hoorzitting: { steps: ["Plan een datum voor de hoorzitting.", "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.", "Bereid de hoorzitting voor met het procesdossier.", "Houd de hoorzitting en leg het verslag vast."], tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd." },
+  Zitting:     { steps: ["Plan een datum voor de hoorzitting.", "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.", "Bereid de hoorzitting voor met het procesdossier.", "Houd de hoorzitting en leg het verslag vast."], tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd." },
+  Advies:      { steps: ["Schrijf het conceptadvies op basis van de hoorzitting.", "Laat het conceptadvies controleren.", "Stuur het definitieve advies naar het bestuursorgaan."], tip: "Het advies moet binnen de beslistermijn verstuurd worden." },
+  Afronding:   { steps: ["Wacht op de beslissing op bezwaar van het bestuursorgaan.", "Ontvang en registreer de beslissing.", "Sluit de zaak af in het systeem."], tip: "Bewaar alle documenten zorgvuldig voor het archief." },
 };
 
 function daysUntil(dateStr: string): number | null {
@@ -34,16 +43,11 @@ function daysUntil(dateStr: string): number | null {
 function DashboardContent() {
   const { cases, updateCase } = useCases();
   const router = useRouter();
-  const [search, setSearch]           = useState("");
-  const [faseFilter, setFaseFilter]   = useState("Alle");
+  const [search, setSearch]         = useState("");
+  const [faseFilter, setFaseFilter] = useState("Alle");
   const [quickFilter, setQuickFilter] = useState<string | null>(null);
-  const [selectedId, setSelectedId]   = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
-
-  function selectCase(id: string) {
-    setSelectedId(id);
-    setMobileShowDetail(true);
-  }
 
   const selectedCase = selectedId ? (cases.find((c) => c.id === selectedId) ?? null) : null;
 
@@ -57,77 +61,85 @@ function DashboardContent() {
     const matchSearch = !search || c.zaaknummer.toLowerCase().includes(q) || c.bezwaarmaker.toLowerCase().includes(q);
     const matchFase   = faseFilter === "Alle" || c.fase === faseFilter;
     let matchQuick    = true;
-    if (quickFilter === "actie")   matchQuick = isOverdue(c.actiedatum);
-    else if (quickFilter === "termijn") matchQuick = isDueSoon(c.actiedatum, 7) && !isOverdue(c.actiedatum);
-    else if (quickFilter === "wachten") matchQuick = c.volgendeActie?.toLowerCase().includes("wacht") ?? false;
+    if      (quickFilter === "actie")    matchQuick = isOverdue(c.actiedatum);
+    else if (quickFilter === "termijn")  matchQuick = isDueSoon(c.actiedatum, 2) && !isOverdue(c.actiedatum);
+    else if (quickFilter === "normaal")  matchQuick = !isOverdue(c.actiedatum) && !isDueSoon(c.actiedatum, 2) && c.fase !== "Afronding";
     else if (quickFilter === "afgerond") matchQuick = c.fase === "Afronding";
     return matchSearch && matchFase && matchQuick;
   });
 
   useEffect(() => {
     if (cases.length > 0 && !selectedId) setSelectedId(cases[0].id);
-  }, [cases.length]);
+  }, [cases.length]); // eslint-disable-line
 
   useEffect(() => {
     if (filtered.length > 0 && !filtered.find((c) => c.id === selectedId))
       setSelectedId(filtered[0].id);
-  }, [faseFilter, quickFilter, search]);
+  }, [faseFilter, quickFilter, search]); // eslint-disable-line
 
   const counts = {
     actie:    cases.filter((c) => isOverdue(c.actiedatum)).length,
-    termijn:  cases.filter((c) => isDueSoon(c.actiedatum, 7) && !isOverdue(c.actiedatum)).length,
-    wachten:  cases.filter((c) => c.volgendeActie?.toLowerCase().includes("wacht") ?? false).length,
+    termijn:  cases.filter((c) => isDueSoon(c.actiedatum, 2) && !isOverdue(c.actiedatum)).length,
+    normaal:  cases.filter((c) => !isOverdue(c.actiedatum) && !isDueSoon(c.actiedatum, 2) && c.fase !== "Afronding").length,
     afgerond: cases.filter((c) => c.fase === "Afronding").length,
   };
 
+  function handleUpdate(base: Case, updates: Partial<Case>) {
+    updateCase({ ...base, ...updates });
+  }
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="flex flex-col h-screen overflow-hidden">
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="flex items-stretch bg-white border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] z-20 flex-shrink-0 h-[58px]">
+      {/* ── Top header ─────────────────────────────────────────────────── */}
+      <header className="flex items-center h-14 bg-white border-b border-gray-200 z-20 flex-shrink-0 px-4 gap-3">
 
-        {/* Logo */}
-        <div className="flex items-center px-4 gap-2.5 border-r border-gray-100 flex-shrink-0">
+        {/* Logo — matches sidebar width */}
+        <div className="flex items-center gap-2.5 flex-shrink-0 w-52">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="BezwaarPilot" className="w-7 h-7 rounded-md object-cover" />
-          <span className="font-semibold text-gray-900 text-sm tracking-tight">BezwaarPilot</span>
+          <span className="font-bold text-gray-900 text-sm tracking-tight">BezwaarPilot</span>
         </div>
 
-        {/* Phase tabs — hidden on mobile */}
-        <div className="hidden md:flex flex-1 overflow-x-auto px-2 gap-1 items-center">
+        {/* Phase filter tabs */}
+        <div className="hidden md:flex flex-1 items-center gap-1">
           {FASE_TABS.map((tab) => {
             const active = faseFilter === tab.key;
             const count  = faseCounts[tab.key] ?? 0;
             return (
               <button
                 key={tab.key}
-                onClick={() => { setFaseFilter(tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 whitespace-nowrap ${
-                  active
-                    ? `${tab.activePill} shadow-sm ring-1 ring-inset ring-black/5`
-                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                onClick={() => { setFaseFilter(active ? "Alle" : tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                  active ? `${tab.pill} shadow-sm` : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full ${tab.bg} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
-                  {count}
-                </span>
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                  active ? "bg-white/25 text-white" : `${tab.bg} text-white`
+                }`}>{count}</span>
                 {tab.label}
               </button>
             );
           })}
         </div>
 
-        {/* Mobile: spacer */}
-        <div className="flex md:hidden flex-1" />
-
-        {/* Right actions */}
-        <div className="flex items-center px-4 gap-2 border-l border-gray-100">
-          <button className="p-2 rounded-xl hover:bg-gray-50 transition-colors">
-            <svg className="w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+        {/* Right: new case + bell + avatar */}
+        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+          <button
+            onClick={() => router.push("/nieuw")}
+            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+              <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Nieuwe zaak
+          </button>
+          <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+            <svg className="w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
             </svg>
           </button>
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-[11px] font-bold select-none shadow-sm">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-bold select-none shadow-sm">
             JD
           </div>
         </div>
@@ -135,22 +147,19 @@ function DashboardContent() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar — full screen on mobile list view, fixed width on desktop ── */}
-        <aside className={`border-r border-gray-100 flex-col flex-shrink-0 bg-white
-          ${mobileShowDetail ? "hidden" : "flex w-full"}
-          md:flex md:w-[232px]`}>
+        {/* ── Dark sidebar ────────────────────────────────────────────── */}
+        <aside className={`flex-col flex-shrink-0 bg-gray-900 border-r border-white/5
+          ${mobileShowDetail ? "hidden" : "flex w-full"} md:flex md:w-52`}>
 
-          {/* Search + new */}
+          {/* Search + add */}
           <div className="px-3 pt-3 pb-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-700">
-                Alle zaken
-                <span className="ml-1.5 font-normal text-gray-400">{cases.length}</span>
+              <span className="text-xs font-semibold text-gray-300">
+                Alle zaken <span className="text-gray-500 font-normal">{cases.length}</span>
               </span>
               <button
                 onClick={() => router.push("/nieuw")}
-                title="Nieuwe zaak"
-                className="w-6 h-6 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
+                className="w-6 h-6 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
                   <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -158,7 +167,7 @@ function DashboardContent() {
               </button>
             </div>
             <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" viewBox="0 0 16 16" fill="none">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" viewBox="0 0 16 16" fill="none">
                 <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M10.5 10.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
@@ -167,38 +176,31 @@ function DashboardContent() {
                 placeholder="Zoek zaak..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-xs rounded-xl border border-gray-200 bg-gray-50 pl-7 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white placeholder:text-gray-400 transition-all duration-150"
+                className="w-full text-xs rounded-lg bg-white/8 border border-white/10 text-gray-200 pl-7 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500/60 focus:bg-white/12 placeholder:text-gray-500 transition-all"
               />
             </div>
           </div>
 
-          {/* Quick filters */}
-          <div className="px-2 pb-2 border-b border-gray-100">
+          {/* Status legend / quick filters */}
+          <div className="px-2 pb-2 border-b border-white/5">
             {[
-              { id: "actie",   label: "Actie vereist",     count: counts.actie,    dot: "bg-red-400"    },
-              { id: "termijn", label: "Termijn < 7 dagen",  count: counts.termijn,  dot: "bg-amber-400"  },
-              { id: "wachten", label: "Wachten op reactie", count: counts.wachten,  dot: "bg-blue-400"   },
-              { id: "afgerond",label: "Afgerond",           count: counts.afgerond, dot: "bg-gray-300"   },
+              { id: "actie",    label: "Actie vereist",     count: counts.actie,    dot: "bg-red-500"     },
+              { id: "termijn",  label: "Termijn < 2 dagen", count: counts.termijn,  dot: "bg-amber-400"   },
+              { id: "normaal",  label: "Normaal",           count: counts.normaal,  dot: "bg-emerald-500" },
+              { id: "afgerond", label: "Afgerond",          count: counts.afgerond, dot: "bg-gray-500"    },
             ].map((f) => (
               <button
                 key={f.id}
-                onClick={() => {
-                  setQuickFilter(quickFilter === f.id ? null : f.id);
-                  if (quickFilter !== f.id) setFaseFilter("Alle");
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-xl text-xs transition-all duration-150 ${
-                  quickFilter === f.id
-                    ? "bg-blue-50 text-blue-700 font-medium"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                onClick={() => { setQuickFilter(quickFilter === f.id ? null : f.id); if (quickFilter !== f.id) setFaseFilter("Alle"); }}
+                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all duration-150 ${
+                  quickFilter === f.id ? "bg-white/10 text-white font-medium" : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${f.dot}`} />
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${f.dot}`} />
                   {f.label}
                 </span>
-                <span className={`tabular-nums ${quickFilter === f.id ? "text-blue-600 font-semibold" : "text-gray-400"}`}>
-                  {f.count}
-                </span>
+                <span className="text-[11px] tabular-nums text-gray-500">{f.count}</span>
               </button>
             ))}
           </div>
@@ -206,69 +208,62 @@ function DashboardContent() {
           {/* Case list */}
           <div className="flex-1 overflow-y-auto">
             {filtered.map((c) => {
-              const days   = daysUntil(c.actiedatum);
+              const days    = daysUntil(c.actiedatum);
               const overdue = days !== null && days < 0;
-              const soon    = days !== null && days >= 0 && days <= 7;
+              const soon    = days !== null && days >= 0 && days <= 2;
               const active  = selectedId === c.id;
               return (
                 <button
                   key={c.id}
-                  onClick={() => selectCase(c.id)}
-                  className={`w-full text-left px-3 py-3 border-b border-gray-50 transition-all duration-150 relative group ${
-                    active ? "bg-blue-50" : "hover:bg-gray-50/80"
+                  onClick={() => { setSelectedId(c.id); setMobileShowDetail(true); }}
+                  className={`w-full text-left px-3 py-3 border-b border-white/5 transition-all duration-150 relative ${
+                    active ? "bg-white/10" : "hover:bg-white/5"
                   }`}
                 >
-                  {/* Active indicator */}
-                  <div className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full transition-all duration-200 ${active ? "bg-blue-500" : "bg-transparent"}`} />
-
-                  <div className="flex items-center justify-between mb-0.5 pl-1">
-                    <span className={`text-xs font-bold transition-colors ${active ? "text-blue-600" : "text-gray-500 group-hover:text-blue-500"}`}>
-                      {c.zaaknummer}
-                    </span>
-                    <FaseBadge fase={c.fase} small />
+                  <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full transition-all ${
+                    overdue ? "bg-red-500" : soon ? "bg-amber-400" : active ? "bg-blue-400" : "bg-transparent"
+                  }`} />
+                  <div className="flex items-center justify-between mb-0.5 pl-2">
+                    <span className={`text-xs font-bold ${active ? "text-white" : "text-gray-300"}`}>{c.zaaknummer}</span>
+                    <FaseBadge fase={c.fase} small dark />
                   </div>
-                  <div className="text-xs font-semibold text-gray-800 mb-0.5 truncate pl-1">{c.bezwaarmaker}</div>
-                  <div className="text-[11px] text-gray-400 truncate mb-1.5 pl-1">{c.volgendeActie}</div>
+                  <div className={`text-xs font-medium truncate mb-0.5 pl-2 ${active ? "text-gray-200" : "text-gray-400"}`}>{c.bezwaarmaker}</div>
+                  <div className="text-[11px] text-gray-500 truncate pl-2">{c.volgendeActie}</div>
                   {days !== null && (
-                    <div className={`flex items-center gap-1 text-[11px] font-medium pl-1 ${
-                      overdue ? "text-red-500" : soon ? "text-amber-500" : "text-gray-400"
-                    }`}>
+                    <div className={`flex items-center gap-1 text-[11px] font-medium pl-2 mt-1 ${overdue ? "text-red-400" : soon ? "text-amber-400" : "text-gray-500"}`}>
                       <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 12 12" fill="none">
                         <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
                         <path d="M6 3.5V6l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                       </svg>
-                      {overdue ? `${Math.abs(days)} dagen te laat` : `Nog ${days} dagen`}
+                      {overdue ? `${Math.abs(days)}d te laat` : `Nog ${days}d`}
                     </div>
                   )}
                 </button>
               );
             })}
             {filtered.length === 0 && (
-              <div className="py-12 text-center">
-                <div className="text-gray-300 text-2xl mb-2">○</div>
-                <p className="text-xs text-gray-400">Geen zaken gevonden</p>
+              <div className="py-10 text-center">
+                <p className="text-xs text-gray-500">Geen zaken gevonden</p>
               </div>
             )}
             {(faseFilter !== "Alle" || quickFilter || search) && filtered.length > 0 && (
               <button
                 onClick={() => { setFaseFilter("Alle"); setQuickFilter(null); setSearch(""); }}
-                className="w-full py-2.5 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50/50 border-t border-gray-100 transition-colors"
+                className="w-full py-2.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 border-t border-white/5 transition-colors"
               >
                 Bekijk alle zaken →
               </button>
             )}
           </div>
 
-          {/* Mobile: fase filter pills */}
-          <div className="md:hidden flex gap-1.5 px-3 py-2.5 overflow-x-auto border-t border-gray-100 flex-shrink-0" style={{ scrollbarWidth: "none" }}>
+          {/* Mobile fase pills */}
+          <div className="md:hidden flex gap-1.5 px-3 py-2.5 overflow-x-auto border-t border-white/5 flex-shrink-0" style={{ scrollbarWidth: "none" }}>
             {FASE_TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => { setFaseFilter(tab.key === faseFilter ? "Alle" : tab.key); setQuickFilter(null); }}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                  faseFilter === tab.key
-                    ? `${tab.activePill} ring-1 ring-inset ring-black/5`
-                    : "bg-gray-100 text-gray-500"
+                  faseFilter === tab.key ? `${tab.pill} shadow-sm` : "bg-white/10 text-gray-400"
                 }`}
               >
                 <span className={`w-4 h-4 rounded-full ${tab.bg} text-white text-[9px] font-bold flex items-center justify-center`}>
@@ -280,16 +275,13 @@ function DashboardContent() {
           </div>
         </aside>
 
-        {/* ── Main panel — hidden on mobile list view ─────────────────── */}
-        <main
-          className={`flex-1 overflow-y-auto ${mobileShowDetail ? "flex flex-col" : "hidden"} md:flex md:flex-col`}
-          style={{ background: "var(--bg)" }}
-        >
+        {/* ── Main content ─────────────────────────────────────────────── */}
+        <main className={`flex-1 overflow-y-auto bg-gray-50 ${mobileShowDetail ? "flex flex-col" : "hidden"} md:flex md:flex-col`}>
           {selectedCase ? (
             <CaseDetailPanel
               key={selectedCase.id}
               zaak={selectedCase}
-              onUpdate={(updates) => updateCase({ ...selectedCase, ...updates })}
+              onUpdate={(updates) => handleUpdate(selectedCase, updates)}
               onBack={() => setMobileShowDetail(false)}
             />
           ) : (
@@ -304,86 +296,30 @@ function DashboardContent() {
             </div>
           )}
         </main>
+
+        {/* ── Right AI panel ───────────────────────────────────────────── */}
+        {selectedCase && (
+          <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+            <RightPanel
+              zaak={selectedCase}
+              onUpdate={(updates) => handleUpdate(selectedCase, updates)}
+            />
+          </aside>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Case detail panel ────────────────────────────────────────────────────────
-
-const FASE_UITLEG: Record<string, { steps: string[]; tip: string }> = {
-  Intake: {
-    steps: [
-      "Controleer of het bezwaar tijdig en volledig is ingediend.",
-      "Stuur een ontvangstbevestiging aan de bezwaarmaker.",
-      "Is het bezwaar onvolledig? Stuur een herstelverzuimbrief.",
-      "Ontvang het herstel en ga door naar de informele fase.",
-    ],
-    tip: "De bezwaartermijn is 6 weken na de besluitdatum. Controleer dit altijd als eerste.",
-  },
-  Informeel: {
-    steps: [
-      "Neem contact op met de vakafdeling voor een informele reactie.",
-      "Stuur zo nodig een reminder als er geen reactie komt.",
-      "Beoordeel de reactie van de vakafdeling.",
-      "Geslaagd? Sluit informeel af. Niet geslaagd? Plan een zitting.",
-    ],
-    tip: "Informele afhandeling bespaart tijd voor alle partijen. Probeer dit altijd eerst.",
-  },
-  Hoorzitting: {
-    steps: [
-      "Plan een datum voor de hoorzitting.",
-      "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.",
-      "Bereid de hoorzitting voor met het procesdossier.",
-      "Houd de hoorzitting en leg het verslag vast.",
-    ],
-    tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd.",
-  },
-  Zitting: {
-    steps: [
-      "Plan een datum voor de hoorzitting.",
-      "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.",
-      "Bereid de hoorzitting voor met het procesdossier.",
-      "Houd de hoorzitting en leg het verslag vast.",
-    ],
-    tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd.",
-  },
-  Advies: {
-    steps: [
-      "Schrijf het conceptadvies op basis van de hoorzitting.",
-      "Laat het conceptadvies controleren.",
-      "Stuur het definitieve advies naar het bestuursorgaan.",
-    ],
-    tip: "Het advies moet binnen de beslistermijn verstuurd worden.",
-  },
-  Afronding: {
-    steps: [
-      "Wacht op de beslissing op bezwaar van het bestuursorgaan.",
-      "Ontvang en registreer de beslissing.",
-      "Sluit de zaak af in het systeem.",
-    ],
-    tip: "Bewaar alle documenten zorgvuldig voor het archief.",
-  },
-};
+// ─── Case detail panel (center) ───────────────────────────────────────────────
 
 function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; onUpdate: (u: Partial<Case>) => void; onBack?: () => void }) {
   const { updateCase } = useCases();
   const [zaak, setZaak]                         = useState<Case>(initialZaak);
   const [saved, setSaved]                       = useState(false);
   const [showZaakgegevens, setShowZaakgegevens] = useState(false);
-  const [showNoteForm, setShowNoteForm]         = useState(false);
-  const [noteInput, setNoteInput]               = useState("");
-  const [showHelpModal, setShowHelpModal]       = useState(false);
-  const [actionChecked, setActionChecked]       = useState(false);
-  const [reminderSent, setReminderSent]         = useState(false);
-  const fileInputRef                            = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setActionChecked(false);
-    setShowNoteForm(false);
-  }, [initialZaak.id]);
-
-  useEffect(() => { setZaak(initialZaak); }, [initialZaak.id]);
+  useEffect(() => { setZaak(initialZaak); setShowZaakgegevens(false); }, [initialZaak.id]); // eslint-disable-line
 
   function applyWorkflow(updates: Partial<Case>) {
     const updated = { ...zaak, ...updates };
@@ -414,109 +350,71 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
 
   function handleSave() {
     updateCase(zaak);
+    onUpdate(zaak);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
 
-  function handleNoteSubmit() {
-    if (!noteInput.trim()) return;
-    const timestamp = new Date().toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-    const newNote = zaak.aantekeningen
-      ? `${zaak.aantekeningen}\n\n[${timestamp}] ${noteInput.trim()}`
-      : `[${timestamp}] ${noteInput.trim()}`;
-    const updated = { ...zaak, aantekeningen: newNote };
-    setZaak(updated);
-    updateCase(updated);
-    setNoteInput("");
-    setShowNoteForm(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  }
-
-  function handleReminder() {
-    const subject = encodeURIComponent(`Reminder: ${zaak.zaaknummer} – ${zaak.bezwaarmaker}`);
-    const body = encodeURIComponent(
-      `Beste,\n\nHierbij een herinnering betreffende de volgende bezwaarzaak:\n\nZaaknummer: ${zaak.zaaknummer}\nBezwaarmaker: ${zaak.bezwaarmaker}\nHuidige fase: ${zaak.fase}\nActie vereist: ${zaak.volgendeActie}\nActiedatum: ${formatDate(zaak.actiedatum)}\n\nGraag uw reactie voor bovenstaande datum.\n\nMet vriendelijke groet,\nBezwaarPilot`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    setReminderSent(true);
-    setTimeout(() => setReminderSent(false), 3000);
-  }
-
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const updated = { ...zaak, uploadedBezwaarFileName: file.name };
-    setZaak(updated);
-    updateCase(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-    e.target.value = "";
-  }
-
-  const faseIndex          = FASE_STEPS.indexOf(zaak.fase);
-  const currentFaseColor   = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
-  const daysToActie        = daysUntil(zaak.actiedatum);
+  const faseIndex           = FASE_STEPS.indexOf(zaak.fase);
+  const currentFaseColor    = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
+  const daysToActie         = daysUntil(zaak.actiedatum);
   const daysToBeslistermijn = daysUntil(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken);
-  const actieOverdue       = daysToActie !== null && daysToActie < 0;
-  const actieSoon          = daysToActie !== null && daysToActie >= 0 && daysToActie <= 7;
+  const actieOverdue        = daysToActie !== null && daysToActie < 0;
+  const actieSoon           = daysToActie !== null && daysToActie >= 0 && daysToActie <= 2;
 
   return (
     <div className="min-h-full">
 
       {/* ── Sticky header ──────────────────────────────────────────── */}
-      <div className="bg-white/90 backdrop-blur-sm border-b border-gray-100 px-6 py-4 sticky top-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="bg-white border-b border-gray-200 px-5 pt-4 pb-4 sticky top-0 z-10 shadow-sm">
 
-        {/* Case title row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3 flex-wrap min-w-0">
-            {/* Mobile back button */}
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0"
-              >
-                <svg className="w-4 h-4 text-gray-600" viewBox="0 0 16 16" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.707 13.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L4.414 7H14a1 1 0 110 2H4.414l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd"/>
-                </svg>
-              </button>
-            )}
-            <h1 className="text-base font-bold text-gray-900 tracking-tight">{zaak.zaaknummer}</h1>
-            <span className="text-sm text-gray-400 font-medium">{zaak.bezwaarmaker}</span>
-            {zaak.status && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-                {zaak.status}
-              </span>
-            )}
-            {saved && (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1 rounded-full ring-1 ring-emerald-200/60 animate-in fade-in duration-200">
-                ✓ Opgeslagen
-              </span>
-            )}
+        {/* Title row */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              {onBack && (
+                <button onClick={onBack} className="md:hidden w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0">
+                  <svg className="w-4 h-4 text-gray-600" viewBox="0 0 16 16" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.707 13.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L4.414 7H14a1 1 0 110 2H4.414l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">{zaak.zaaknummer}</h1>
+              {(actieOverdue || actieSoon) && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M6 1a5 5 0 100 10A5 5 0 006 1zm0 7.5a.75.75 0 110-1.5.75.75 0 010 1.5zM6.5 6h-1L5.25 3h1.5L6.5 6z" />
+                  </svg>
+                  Herinnering sturen
+                </span>
+              )}
+              {saved && (
+                <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">✓ Opgeslagen</span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">{zaak.bezwaarmaker}</p>
           </div>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 font-medium shadow-sm">
-            Meer acties <span className="text-gray-300 text-base leading-none">···</span>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium whitespace-nowrap ml-3 flex-shrink-0 shadow-sm">
+            Meer acties
+            <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 14 14" fill="none">
+              <path d="M3.5 6l3.5 3.5L10.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
 
-        {/* Phase progress */}
-        <div className="flex items-center gap-0 overflow-x-auto pb-1 -mb-1"
-          style={{ scrollbarWidth: "none" }}
-        >
+        {/* Phase stepper */}
+        <div className="flex items-center overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {FASE_STEPS.map((fase, i) => {
             const done    = i < faseIndex;
             const current = i === faseIndex;
             const color   = FASE_COLORS[fase] ?? FASE_COLORS.Intake;
             return (
               <div key={fase} className="flex items-center flex-1 min-w-0">
-                <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                <div className="flex flex-col items-center gap-1 flex-shrink-0">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
-                    done
-                      ? "bg-emerald-500 border-emerald-500 shadow-sm"
-                      : current
-                      ? `${color.bg} border-transparent shadow-md ring-4 ${color.ring}`
-                      : "bg-white border-gray-200"
+                    done    ? "bg-emerald-500 border-emerald-500 shadow-sm"
+                    : current ? `${color.bg} border-transparent shadow-md ring-4 ${color.ring}`
+                    : "bg-white border-gray-200"
                   }`}>
                     {done ? (
                       <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 14 14" fill="currentColor">
@@ -526,14 +424,12 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
                       <span className={`text-xs font-bold ${current ? "text-white" : "text-gray-300"}`}>{i + 1}</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold whitespace-nowrap tracking-tight ${
-                    current ? color.text : done ? "text-emerald-500" : "text-gray-300"
-                  }`}>
-                    {fase}
-                  </span>
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${
+                    current ? color.text : done ? "text-emerald-600" : "text-gray-300"
+                  }`}>{fase}</span>
                 </div>
                 {i < FASE_STEPS.length - 1 && (
-                  <div className={`h-px flex-1 mx-2 mb-5 transition-all duration-500 ${i < faseIndex ? "bg-emerald-300" : "bg-gray-100"}`} />
+                  <div className={`h-px flex-1 mx-2 mb-4 ${i < faseIndex ? "bg-emerald-300" : "bg-gray-200"}`} />
                 )}
               </div>
             );
@@ -541,341 +437,323 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
         </div>
       </div>
 
-      {/* ── Content grid ───────────────────────────────────────────── */}
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Content ────────────────────────────────────────────────── */}
+      <div className="p-5 space-y-4">
 
-        {/* Left 2 cols */}
-        <div className="col-span-1 md:col-span-2 space-y-4">
+        {/* Top info cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
-          {/* Fase + timer card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {/* Huidige fase */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Huidige fase</p>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${currentFaseColor.bg} shadow-sm`}>
-                  <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{zaak.fase}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 leading-tight">{zaak.status || "—"}</p>
-                </div>
+          {/* Huidige fase */}
+          <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Huidige fase</p>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${currentFaseColor.bg} shadow-sm`}>
+                <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
               </div>
-            </div>
-
-            {/* Timer */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Resterende tijd</p>
-              {daysToActie !== null ? (
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
-                    actieOverdue ? "bg-red-500" : actieSoon ? "bg-amber-500" : "bg-blue-500"
-                  }`}>
-                    <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="none">
-                      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M10 6.5v3.5l2.5 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className={`text-sm font-bold ${actieOverdue ? "text-red-600" : actieSoon ? "text-amber-600" : "text-gray-900"}`}>
-                      {actieOverdue ? `${Math.abs(daysToActie)} dagen te laat` : `Nog ${daysToActie} dagen`}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">Actiedatum: {formatDate(zaak.actiedatum)}</p>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-sm text-gray-300">Niet ingesteld</span>
-              )}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* Beslistermijn */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600 rounded-t-2xl" />
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Beslistermijn</p>
-              {daysToBeslistermijn !== null ? (
-                <>
-                  <p className={`text-2xl font-bold leading-tight ${daysToBeslistermijn < 14 ? "text-red-600" : daysToBeslistermijn < 30 ? "text-amber-600" : "text-gray-900"}`}>
-                    Nog {daysToBeslistermijn}
-                    <span className="text-base font-semibold text-gray-400 ml-1">dagen</span>
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {formatDate(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken)}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-300">Niet ingesteld</p>
-              )}
-            </div>
-
-            {/* Actie vereist */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500 rounded-t-2xl" />
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Actie vereist</p>
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 14 14" fill="currentColor">
-                    <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 10a1 1 0 110-2 1 1 0 010 2zm.5-3.5h-1l-.25-4h1.5L7.5 7.5z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-gray-800 leading-snug">{zaak.volgendeActie || "—"}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900">{zaak.fase}</p>
+                <p className="text-xs text-gray-500 mt-0.5 truncate">{zaak.status || "In behandeling"}</p>
               </div>
             </div>
           </div>
 
-          {/* Volgende actie + workflow */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 14 14" fill="currentColor">
-                    <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 10a1 1 0 110-2 1 1 0 010 2zm.5-3.5h-1l-.25-4h1.5L7.5 7.5z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Volgende actie</p>
-                  <p className="text-sm font-semibold text-gray-900 mt-0.5">{zaak.volgendeActie || "—"}</p>
-                </div>
-              </div>
+          {/* Resterende tijd */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Resterende tijd</p>
+            {daysToActie !== null ? (
+              <>
+                <p className={`text-xl font-bold leading-tight ${actieOverdue ? "text-red-600" : actieSoon ? "text-amber-500" : "text-gray-900"}`}>
+                  {actieOverdue ? `${Math.abs(daysToActie)}d` : `${daysToActie}d`}
+                </p>
+                <p className={`text-[11px] mt-0.5 ${actieOverdue ? "text-red-500" : actieSoon ? "text-amber-500" : "text-gray-400"}`}>
+                  {actieOverdue ? "te laat" : "resterend"}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-300">—</p>
+            )}
+          </div>
+
+          {/* Beslistermijn */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Beslistermijn</p>
+            {daysToBeslistermijn !== null ? (
+              <>
+                <p className={`text-xl font-bold leading-tight ${daysToBeslistermijn < 14 ? "text-red-600" : daysToBeslistermijn < 30 ? "text-amber-500" : "text-gray-900"}`}>
+                  {daysToBeslistermijn}d
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken)}</p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-300">—</p>
+            )}
+          </div>
+        </div>
+
+        {/* Second row: dates */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Datum ontvangst", value: formatDate(zaak.datumOntvangst) },
+            { label: "Datum besluit",   value: formatDate(zaak.datumBesluit)   },
+            { label: "Actiedatum",      value: formatDate(zaak.actiedatum)     },
+            { label: "Hoorzitting",     value: formatDate(zaak.datumHoorzitting) },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-sm">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+              <p className="text-sm font-semibold text-gray-800">{value || "—"}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Volgende actie */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Volgende actie</p>
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4.5 h-4.5 text-orange-500" viewBox="0 0 18 18" fill="currentColor" width="18" height="18">
+                <path d="M9 1a8 8 0 100 16A8 8 0 009 1zm0 13a1 1 0 110-2 1 1 0 010 2zm.5-4.5h-1L8.25 5h1.5L9.5 9.5z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">{zaak.volgendeActie || "—"}</p>
               {zaak.actiedatum && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-100">
-                  <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 14 14" fill="none">
-                    <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M5 1v2M9 1v2M2 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
-                  {formatDate(zaak.actiedatum)}
-                </div>
+                <p className="text-xs text-gray-400 mt-0.5">Actiedatum: {formatDate(zaak.actiedatum)}</p>
               )}
             </div>
-
-            <div className="border-t border-gray-50 pt-4">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Beschikbare acties</p>
-              <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
-            </div>
-          </div>
-
-          {/* Zaakgegevens collapsible */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <button
-              onClick={() => setShowZaakgegevens(!showZaakgegevens)}
-              className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-semibold text-gray-700 hover:bg-gray-50/80 transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
-                Zaakgegevens
-              </span>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showZaakgegevens ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none">
-                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-            {showZaakgegevens && (
-              <div className="px-5 pb-5 border-t border-gray-50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                  <EditableField label="Zaaknummer"           value={zaak.zaaknummer}         onChange={(v) => handleFieldChange("zaaknummer", v)} />
-                  <EditableField label="Bezwaarmaker"         value={zaak.bezwaarmaker}        onChange={(v) => handleFieldChange("bezwaarmaker", v)} />
-                  <EditableField label="Datum ontvangst"      value={zaak.datumOntvangst}      type="date" onChange={(v) => handleFieldChange("datumOntvangst", v)} />
-                  <EditableField label="Datum besluit"        value={zaak.datumBesluit}        type="date" onChange={(v) => handleFieldChange("datumBesluit", v)} />
-                  <EditableField label="Beslistermijn"        value={zaak.beslistermijn12Weken} type="date" onChange={(v) => handleFieldChange("beslistermijn12Weken", v)} />
-                  <EditableField label="Actiedatum"           value={zaak.actiedatum}          type="date" onChange={(v) => handleFieldChange("actiedatum", v)} />
-                  <EditableField label="Datum hoorzitting"    value={zaak.datumHoorzitting}    type="date" onChange={(v) => handleFieldChange("datumHoorzitting", v)} />
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Verdaagd</label>
-                    <select
-                      className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-                      value={zaak.verdaagd}
-                      onChange={(e) => handleFieldChange("verdaagd", e.target.value)}
-                    >
-                      <option value="Nee">Nee</option>
-                      <option value="Ja">Ja</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Aantekeningen</label>
-                  <textarea
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 min-h-[64px] resize-y transition-all"
-                    value={zaak.aantekeningen}
-                    onChange={(e) => handleFieldChange("aantekeningen", e.target.value)}
-                    placeholder="Notities..."
-                  />
-                </div>
-                <button
-                  className="mt-3 inline-flex items-center px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-sm hover:shadow-md transition-all duration-150 active:scale-[0.98]"
-                  onClick={handleSave}
-                >
-                  Wijzigingen opslaan
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Right column */}
-        <div className="space-y-4">
+        {/* Beschikbare acties */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
+          <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
+        </div>
 
-          {/* AI Assistent */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 14 14" fill="currentColor">
-                    <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 10a1 1 0 110-2 1 1 0 010 2zm.5-3.5h-1l-.25-4h1.5L7.5 7.5z" />
-                  </svg>
+        {/* Zaakgegevens collapsible */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <button
+            onClick={() => setShowZaakgegevens(!showZaakgegevens)}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+              Zaakgegevens
+            </span>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showZaakgegevens ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+          {showZaakgegevens && (
+            <div className="px-4 pb-4 border-t border-gray-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                <EditableField label="Zaaknummer"        value={zaak.zaaknummer}          onChange={(v) => handleFieldChange("zaaknummer", v)} />
+                <EditableField label="Bezwaarmaker"      value={zaak.bezwaarmaker}         onChange={(v) => handleFieldChange("bezwaarmaker", v)} />
+                <EditableField label="Datum ontvangst"   value={zaak.datumOntvangst}       type="date" onChange={(v) => handleFieldChange("datumOntvangst", v)} />
+                <EditableField label="Datum besluit"     value={zaak.datumBesluit}         type="date" onChange={(v) => handleFieldChange("datumBesluit", v)} />
+                <EditableField label="Beslistermijn"     value={zaak.beslistermijn12Weken} type="date" onChange={(v) => handleFieldChange("beslistermijn12Weken", v)} />
+                <EditableField label="Actiedatum"        value={zaak.actiedatum}           type="date" onChange={(v) => handleFieldChange("actiedatum", v)} />
+                <EditableField label="Datum hoorzitting" value={zaak.datumHoorzitting}     type="date" onChange={(v) => handleFieldChange("datumHoorzitting", v)} />
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Verdaagd</label>
+                  <select
+                    className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                    value={zaak.verdaagd}
+                    onChange={(e) => handleFieldChange("verdaagd", e.target.value)}
+                  >
+                    <option value="Nee">Nee</option>
+                    <option value="Ja">Ja</option>
+                  </select>
                 </div>
-                <span className="text-sm font-semibold text-gray-900">AI Assistent</span>
               </div>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Binnenkort</span>
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Aantekeningen</label>
+                <textarea
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 min-h-[64px] resize-y transition-all"
+                  value={zaak.aantekeningen}
+                  onChange={(e) => handleFieldChange("aantekeningen", e.target.value)}
+                  placeholder="Notities..."
+                />
+              </div>
+              <button
+                onClick={handleSave}
+                className="mt-3 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-sm transition-all"
+              >
+                Wijzigingen opslaan
+              </button>
             </div>
-            <div className="mb-3">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Huidige fase</p>
-              <div className={`${currentFaseColor.bg} bg-opacity-10 rounded-xl px-3 py-2`}>
-                <span className={`text-sm font-semibold ${currentFaseColor.text}`}>{zaak.fase}</span>
-              </div>
-            </div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Actie vereist</p>
-            <label className="flex items-start gap-2 cursor-pointer group" onClick={() => setActionChecked(!actionChecked)}>
-              <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
-                actionChecked ? "bg-blue-600 border-blue-600" : "border-gray-300 group-hover:border-blue-400"
-              }`}>
-                {actionChecked && (
-                  <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.5 2.5a.75.75 0 010 1.06l-4 4a.75.75 0 01-1.06 0l-1.5-1.5a.75.75 0 011.06-1.06L4 6l3.47-3.47a.75.75 0 011.03-.03z" />
-                  </svg>
-                )}
-              </div>
-              <span className={`text-xs leading-relaxed transition-colors ${actionChecked ? "line-through text-gray-400" : "text-gray-600 group-hover:text-gray-900"}`}>
-                {zaak.volgendeActie || "—"}
-              </span>
-            </label>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Right AI panel ───────────────────────────────────────────────────────────
+
+function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  const { updateCase } = useCases();
+  const [showNoteForm, setShowNoteForm]   = useState(false);
+  const [noteInput, setNoteInput]         = useState("");
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [actionChecked, setActionChecked] = useState(false);
+  const [reminderSent, setReminderSent]   = useState(false);
+  const fileInputRef                      = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setActionChecked(false); setShowNoteForm(false); setNoteInput(""); }, [zaak.id]);
+
+  const currentFaseColor = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
+
+  function handleReminder() {
+    const subject = encodeURIComponent(`Reminder: ${zaak.zaaknummer} – ${zaak.bezwaarmaker}`);
+    const body    = encodeURIComponent(`Beste,\n\nHierbij een herinnering betreffende:\n\nZaaknummer: ${zaak.zaaknummer}\nBezwaarmaker: ${zaak.bezwaarmaker}\nFase: ${zaak.fase}\nActie: ${zaak.volgendeActie}\nActiedatum: ${formatDate(zaak.actiedatum)}\n\nMet vriendelijke groet,\nBezwaarPilot`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    setReminderSent(true);
+    setTimeout(() => setReminderSent(false), 3000);
+  }
+
+  function handleNoteSubmit() {
+    if (!noteInput.trim()) return;
+    const ts      = new Date().toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const newNote = zaak.aantekeningen ? `${zaak.aantekeningen}\n\n[${ts}] ${noteInput.trim()}` : `[${ts}] ${noteInput.trim()}`;
+    const updated = { ...zaak, aantekeningen: newNote };
+    updateCase(updated);
+    onUpdate({ aantekeningen: newNote });
+    setNoteInput("");
+    setShowNoteForm(false);
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const updated = { ...zaak, uploadedBezwaarFileName: file.name };
+    updateCase(updated);
+    onUpdate({ uploadedBezwaarFileName: file.name });
+    e.target.value = "";
+  }
+
+  const snelleActies = [
+    { label: reminderSent ? "E-mail geopend ✓" : "Herinnering naar aanvrager", onClick: handleReminder, done: reminderSent },
+    { label: "Reactie categoriseren",  onClick: () => setShowNoteForm(!showNoteForm), done: false },
+    { label: "Notitie toevoegen",      onClick: () => setShowNoteForm(!showNoteForm), done: false },
+    { label: zaak.uploadedBezwaarFileName ? `✓ ${zaak.uploadedBezwaarFileName}` : "Document uploaden", onClick: () => fileInputRef.current?.click(), done: !!zaak.uploadedBezwaarFileName },
+  ];
+
+  return (
+    <div className="flex flex-col h-full">
+
+      {/* Header */}
+      <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm flex-shrink-0">
+            <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a4 4 0 00-4 4c0 1.49.82 2.79 2.03 3.47L5.5 14h5l-.53-5.53A4 4 0 008 1z" />
+            </svg>
           </div>
+          <span className="text-sm font-bold text-gray-900">AI Assistent</span>
+        </div>
+      </div>
 
-          {/* Snelle acties */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2.5">Snelle acties</p>
-            <div className="space-y-0.5">
+      {/* Huidige fase */}
+      <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Huidige fase</p>
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${currentFaseColor.light} ${currentFaseColor.text} border ${currentFaseColor.border}`}>
+          {zaak.fase}
+        </span>
+        {zaak.status && <p className="text-xs text-gray-500 mt-2 leading-relaxed">{zaak.status}</p>}
+      </div>
 
-              {/* Reminder */}
-              <button
-                onClick={handleReminder}
-                className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
-              >
-                <span className={reminderSent ? "text-emerald-600 font-medium" : ""}>
-                  {reminderSent ? "E-mail geopend ✓" : "Reminder sturen naar vakafdeling"}
-                </span>
-                <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-
-              {/* Reactie toelichten / Notitie toevoegen */}
-              {["Reactie toelichten", "Notitie toevoegen"].map((label) => (
-                <button
-                  key={label}
-                  onClick={() => setShowNoteForm(!showNoteForm)}
-                  className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
-                >
-                  <span>{label}</span>
-                  <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-all duration-150 ${showNoteForm ? "rotate-90 text-blue-400" : "text-gray-300 group-hover:text-gray-500"}`} viewBox="0 0 14 14" fill="none">
-                    <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </button>
-              ))}
-
-              {/* Inline note form */}
-              {showNoteForm && (
-                <div className="pt-1 pb-1">
-                  <textarea
-                    autoFocus
-                    value={noteInput}
-                    onChange={(e) => setNoteInput(e.target.value)}
-                    placeholder="Typ uw notitie..."
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 min-h-[72px] resize-none transition-all"
-                    onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) handleNoteSubmit(); }}
-                  />
-                  <div className="flex gap-2 mt-1.5">
-                    <button
-                      onClick={handleNoteSubmit}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                      Opslaan
-                    </button>
-                    <button
-                      onClick={() => { setShowNoteForm(false); setNoteInput(""); }}
-                      className="px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 text-xs transition-colors"
-                    >
-                      Annuleren
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Document uploaden */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
-              >
-                <span>
-                  {zaak.uploadedBezwaarFileName
-                    ? <span className="text-emerald-600 font-medium truncate">✓ {zaak.uploadedBezwaarFileName}</span>
-                    : "Document uploaden"
-                  }
-                </span>
-                <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.jpg,.png" />
-            </div>
-
-            {/* Notes preview */}
-            {zaak.aantekeningen && (
-              <div className="mt-3 pt-3 border-t border-gray-50">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Aantekeningen</p>
-                <p className="text-xs text-gray-500 whitespace-pre-wrap leading-relaxed line-clamp-4">{zaak.aantekeningen}</p>
-              </div>
+      {/* Actie vereist */}
+      <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Actie vereist</p>
+        <label className="flex items-start gap-2.5 cursor-pointer group" onClick={() => setActionChecked(!actionChecked)}>
+          <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+            actionChecked ? "bg-blue-600 border-blue-600" : "border-gray-300 group-hover:border-blue-400"
+          }`}>
+            {actionChecked && (
+              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
+                <path fillRule="evenodd" d="M8.5 2.5a.75.75 0 010 1.06l-4 4a.75.75 0 01-1.06 0l-1.5-1.5a.75.75 0 011.06-1.06L4 6l3.47-3.47a.75.75 0 011.03-.03z" />
+              </svg>
             )}
           </div>
+          <span className={`text-xs leading-relaxed transition-colors ${actionChecked ? "line-through text-gray-400" : "text-gray-700 group-hover:text-gray-900"}`}>
+            {zaak.volgendeActie || "—"}
+          </span>
+        </label>
+      </div>
 
-          {/* Help */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <svg className="w-4 h-4 text-blue-500 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 11a1 1 0 110-2 1 1 0 010 2zm.75-4h-1.5l-.25-3.5h2L8.75 8z" />
-              </svg>
-              <span className="text-xs font-semibold text-blue-700">Hulp nodig?</span>
-            </div>
-            <p className="text-xs text-blue-600/70 mb-2.5 leading-relaxed">
-              Bekijk uitleg over deze stap en het proces.
-            </p>
+      {/* Snelle acties */}
+      <div className="px-4 py-3 flex-1">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Snelle acties</p>
+        <div className="space-y-0.5">
+          {snelleActies.map((a, i) => (
             <button
-              onClick={() => setShowHelpModal(true)}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors"
+              key={i}
+              onClick={a.onClick}
+              className={`w-full flex items-center justify-between text-xs px-2.5 py-2 rounded-xl transition-all group text-left ${
+                a.done ? "text-emerald-600 font-medium hover:bg-emerald-50" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              }`}
             >
-              Open uitleg →
+              <span>{a.label}</span>
+              <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${a.done ? "text-emerald-400" : "text-gray-300 group-hover:text-gray-500"}`} viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </button>
-          </div>
+          ))}
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.jpg,.png" />
         </div>
+
+        {/* Inline note form */}
+        {showNoteForm && (
+          <div className="mt-2">
+            <textarea
+              autoFocus
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              placeholder="Typ uw notitie..."
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 min-h-[72px] resize-none transition-all"
+              onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) handleNoteSubmit(); }}
+            />
+            <div className="flex gap-2 mt-1.5">
+              <button onClick={handleNoteSubmit} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm">Opslaan</button>
+              <button onClick={() => { setShowNoteForm(false); setNoteInput(""); }} className="px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 text-xs transition-colors">Annuleren</button>
+            </div>
+          </div>
+        )}
+
+        {/* Notes preview */}
+        {zaak.aantekeningen && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Aantekeningen</p>
+            <p className="text-xs text-gray-500 whitespace-pre-wrap leading-relaxed line-clamp-4">{zaak.aantekeningen}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Help nodig */}
+      <div className="px-4 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50/60">
+        <p className="text-xs font-bold text-gray-700 mb-1">Help nodig?</p>
+        <p className="text-xs text-gray-400 mb-2 leading-relaxed">Bekijk uitleg over het proces en de huidige stap.</p>
+        <button
+          onClick={() => setShowHelpModal(true)}
+          className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors"
+        >
+          Stuur afvraag →
+        </button>
       </div>
 
       {/* Help modal */}
       {showHelpModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
           onClick={() => setShowHelpModal(false)}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowHelpModal(false)}
               className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
@@ -884,7 +762,6 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
                 <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
-
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${currentFaseColor.bg} shadow-sm`}>
                 <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -896,31 +773,20 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
                 <p className="text-xs text-gray-400">Stap-voor-stap uitleg</p>
               </div>
             </div>
-
             <div className="space-y-2.5 mb-4">
               {(FASE_UITLEG[zaak.fase]?.steps ?? []).map((step, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold text-white ${currentFaseColor.bg}`}>
-                    {i + 1}
-                  </div>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold text-white ${currentFaseColor.bg}`}>{i + 1}</div>
                   <p className="text-xs text-gray-700 leading-relaxed">{step}</p>
                 </div>
               ))}
             </div>
-
             {FASE_UITLEG[zaak.fase]?.tip && (
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                <p className="text-xs text-amber-700 leading-relaxed">
-                  <span className="font-semibold">Tip: </span>
-                  {FASE_UITLEG[zaak.fase].tip}
-                </p>
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4">
+                <p className="text-xs text-amber-700 leading-relaxed"><span className="font-semibold">Tip: </span>{FASE_UITLEG[zaak.fase].tip}</p>
               </div>
             )}
-
-            <button
-              onClick={() => setShowHelpModal(false)}
-              className="mt-4 w-full py-2 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors"
-            >
+            <button onClick={() => setShowHelpModal(false)} className="w-full py-2 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors">
               Sluiten
             </button>
           </div>
@@ -936,35 +802,29 @@ type ActionDef = { label: string; variant: "green" | "red" | "blue"; updates: Pa
 
 function getActionsForFase(fase: string): ActionDef[] {
   switch (fase) {
-    case "Intake":
-      return [
-        { label: "Ontvangstbevestiging verzonden", variant: "green", updates: { status: "Ontvangstbevestiging verzonden", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
-        { label: "Herstelverzuimbrief verzonden",  variant: "red",   updates: { status: "🔴 In afwachting herstel", volgendeActie: "Controleer hersteltermijn" } },
-        { label: "Herstel ontvangen",              variant: "blue",  updates: { status: "🟢 Herstel ontvangen", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
-      ];
-    case "Informeel":
-      return [
-        { label: "Informeel afgerond",      variant: "green", updates: { status: "🟢 Informele afhandeling afgerond", volgendeActie: "Verzoek intrekking bezwaar versturen" } },
-        { label: "Informeel niet geslaagd", variant: "red",   updates: { status: "🔵 Zitting plannen", fase: "Zitting", volgendeActie: "Plan hoorzitting" } },
-        { label: "Zitting plannen",         variant: "blue",  updates: { fase: "Hoorzitting", volgendeActie: "Hoorzitting plannen" } },
-      ];
+    case "Intake":      return [
+      { label: "Ontvangstbevestiging verzonden", variant: "green", updates: { status: "Ontvangstbevestiging verzonden", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
+      { label: "Herstelverzuimbrief verzonden",  variant: "red",   updates: { status: "In afwachting herstel", volgendeActie: "Controleer hersteltermijn" } },
+      { label: "Herstel ontvangen",              variant: "blue",  updates: { status: "Herstel ontvangen", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
+    ];
+    case "Informeel":   return [
+      { label: "Informeel afgerond",      variant: "green", updates: { status: "Informele afhandeling afgerond", volgendeActie: "Verzoek intrekking bezwaar versturen" } },
+      { label: "Informeel niet geslaagd", variant: "red",   updates: { status: "Zitting plannen", fase: "Zitting", volgendeActie: "Plan hoorzitting" } },
+      { label: "Zitting plannen",         variant: "blue",  updates: { fase: "Hoorzitting", volgendeActie: "Hoorzitting plannen" } },
+    ];
     case "Zitting":
-    case "Hoorzitting":
-      return [
-        { label: "Zitting gepland",    variant: "green", updates: { status: "🔵 Zitting gepland", volgendeActie: "Uitnodigingen versturen" } },
-        { label: "Hoorzitting geweest",variant: "blue",  updates: { status: "🟣 Advies uitwerken", fase: "Advies", volgendeActie: "Conceptadvies maken" } },
-      ];
-    case "Advies":
-      return [
-        { label: "Advies verzonden", variant: "green", updates: { status: "🟣 Advies verzonden", fase: "Afronding", adviesUitgebracht: "Ja", datumAdvies: todayISO(), volgendeActie: "Wachten op beslissing" } as Partial<Case> },
-      ];
-    case "Afronding":
-      return [
-        { label: "Beslissing ontvangen", variant: "green", updates: { beslissingOpBezwaar: "Ja" as const, datumBeslissingOpBezwaar: todayISO(), volgendeActie: "Zaak sluiten" } },
-        { label: "Zaak afgerond",        variant: "blue",  updates: { status: "⚫ Afgerond", volgendeActie: "Geen" } },
-      ];
-    default:
-      return [];
+    case "Hoorzitting": return [
+      { label: "Zitting gepland",     variant: "green", updates: { status: "Zitting gepland", volgendeActie: "Uitnodigingen versturen" } },
+      { label: "Hoorzitting geweest", variant: "blue",  updates: { status: "Advies uitwerken", fase: "Advies", volgendeActie: "Conceptadvies maken" } },
+    ];
+    case "Advies":      return [
+      { label: "Advies verzonden", variant: "green", updates: { status: "Advies verzonden", fase: "Afronding", adviesUitgebracht: "Ja", datumAdvies: todayISO(), volgendeActie: "Wachten op beslissing" } as Partial<Case> },
+    ];
+    case "Afronding":   return [
+      { label: "Beslissing ontvangen", variant: "green", updates: { beslissingOpBezwaar: "Ja" as const, datumBeslissingOpBezwaar: todayISO(), volgendeActie: "Zaak sluiten" } },
+      { label: "Zaak afgerond",        variant: "blue",  updates: { status: "Afgerond", volgendeActie: "Geen" } },
+    ];
+    default: return [];
   }
 }
 
@@ -980,27 +840,19 @@ function WorkflowActions({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial
 
 function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdate: (u: Partial<Case>) => void }) {
   const [clicked, setClicked] = useState(false);
+  function handleClick() { onUpdate(action.updates); setClicked(true); setTimeout(() => setClicked(false), 2000); }
 
-  function handleClick() {
-    onUpdate(action.updates);
-    setClicked(true);
-    setTimeout(() => setClicked(false), 2000);
-  }
-
-  const styles: Record<ActionDef["variant"], { base: string; iconBg: string }> = {
+  const styles = {
     green: { base: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300", iconBg: "bg-emerald-500" },
     red:   { base: "bg-red-50   border-red-200   text-red-700   hover:bg-red-100   hover:border-red-300",   iconBg: "bg-red-500"     },
     blue:  { base: "bg-blue-50  border-blue-200  text-blue-700  hover:bg-blue-100  hover:border-blue-300",  iconBg: "bg-blue-500"    },
   };
-
   const icons: Record<ActionDef["variant"], JSX.Element> = {
     green: <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg>,
     red:   <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M2.72 2.72a.75.75 0 011.06 0L6 4.94l2.22-2.22a.75.75 0 111.06 1.06L7.06 6l2.22 2.22a.75.75 0 11-1.06 1.06L6 7.06 3.78 9.28a.75.75 0 01-1.06-1.06L4.94 6 2.72 3.78a.75.75 0 010-1.06z" /></svg>,
     blue:  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M5 6a2 2 0 100-4 2 2 0 000 4zm-4 4c0-1.657 1.79-3 4-3s4 1.343 4 3H1zm8-3a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm1.5 3h-1.6c-.13-.37-.38-.71-.7-.97.36-.08.73-.03 1.3.47v.5z" /></svg>,
   };
-
   const s = styles[action.variant];
-
   return (
     <button
       onClick={handleClick}
@@ -1009,10 +861,7 @@ function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdat
       }`}
     >
       <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${clicked ? "bg-emerald-500" : s.iconBg}`}>
-        {clicked
-          ? <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg>
-          : icons[action.variant]
-        }
+        {clicked ? <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg> : icons[action.variant]}
       </div>
       {action.label}
     </button>
@@ -1021,16 +870,24 @@ function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdat
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function FaseBadge({ fase, small }: { fase: string; small?: boolean }) {
-  const colors: Record<string, string> = {
+function FaseBadge({ fase, small, dark }: { fase: string; small?: boolean; dark?: boolean }) {
+  const light: Record<string, string> = {
     Intake:      "bg-blue-100    text-blue-700",
     Informeel:   "bg-orange-100  text-orange-700",
     Zitting:     "bg-violet-100  text-violet-700",
     Hoorzitting: "bg-purple-100  text-purple-700",
-    Advies:      "bg-red-100     text-red-700",
-    Afronding:   "bg-emerald-100 text-emerald-700",
+    Advies:      "bg-emerald-100 text-emerald-700",
+    Afronding:   "bg-gray-100    text-gray-600",
   };
-  const cls = colors[fase] ?? "bg-gray-100 text-gray-600";
+  const darkCls: Record<string, string> = {
+    Intake:      "bg-blue-500/20    text-blue-300",
+    Informeel:   "bg-orange-500/20  text-orange-300",
+    Zitting:     "bg-violet-500/20  text-violet-300",
+    Hoorzitting: "bg-purple-500/20  text-purple-300",
+    Advies:      "bg-emerald-500/20 text-emerald-300",
+    Afronding:   "bg-gray-500/20    text-gray-400",
+  };
+  const cls = dark ? (darkCls[fase] ?? "bg-gray-500/20 text-gray-400") : (light[fase] ?? "bg-gray-100 text-gray-600");
   return (
     <span className={`inline-flex items-center rounded-full font-semibold ${cls} ${small ? "text-[10px] px-1.5 py-px" : "text-xs px-2 py-0.5"}`}>
       {fase}
@@ -1038,15 +895,13 @@ function FaseBadge({ fase, small }: { fase: string; small?: boolean }) {
   );
 }
 
-function EditableField({ label, value, type = "text", onChange }: {
-  label: string; value: string; type?: string; onChange: (v: string) => void;
-}) {
+function EditableField({ label, value, type = "text", onChange }: { label: string; value: string; type?: string; onChange: (v: string) => void }) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-400 mb-1.5">{label}</label>
       <input
         type={type}
-        className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-150 bg-white"
+        className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all bg-white"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
