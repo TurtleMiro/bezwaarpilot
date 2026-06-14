@@ -102,7 +102,7 @@ function DashboardContent() {
     <div className="flex flex-col h-screen overflow-hidden">
 
       {/* ── Top header ─────────────────────────────────────────────────── */}
-      <header className="flex items-center h-14 bg-white border-b border-gray-200 z-20 flex-shrink-0 px-4 gap-3">
+      <header className="flex items-center h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 z-20 flex-shrink-0 px-4 gap-3 shadow-sm">
 
         {/* Logo — matches sidebar width */}
         <div className="flex items-center gap-2.5 flex-shrink-0 w-52">
@@ -120,10 +120,10 @@ function DashboardContent() {
               <button
                 key={tab.key}
                 onClick={() => { setFaseFilter(active ? "Alle" : tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 border active:scale-[0.96] ${
                   active
-                    ? `${tab.pill} border-transparent shadow-sm`
-                    : `bg-white ${tab.inactive} border-gray-200`
+                    ? `${tab.pill} border-transparent shadow-md`
+                    : `bg-white ${tab.inactive} border-gray-200 hover:shadow-sm`
                 }`}
               >
                 <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -142,7 +142,7 @@ function DashboardContent() {
         <div className="flex items-center gap-2 ml-auto flex-shrink-0">
           <button
             onClick={() => router.push("/nieuw")}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full hover:bg-blue-700 transition-colors shadow-sm"
+            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full hover:bg-blue-700 hover:shadow-md active:scale-[0.96] transition-all duration-150 shadow-sm"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
               <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -240,8 +240,8 @@ function DashboardContent() {
                 <button
                   key={c.id}
                   onClick={() => { setSelectedId(c.id); setMobileShowDetail(true); }}
-                  className={`w-full text-left px-3 py-3 border-b border-white/5 transition-all duration-150 relative ${
-                    active ? "bg-white/10" : "hover:bg-white/5"
+                  className={`w-full text-left px-3 py-3 border-b border-white/5 transition-all duration-200 relative ${
+                    active ? "bg-white/12 shadow-inner" : "hover:bg-white/7"
                   }`}
                 >
                   <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full transition-all ${
@@ -444,7 +444,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
     <div className="min-h-full">
 
       {/* ── Sticky header ──────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-5 pt-4 pb-4 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white/95 backdrop-blur-sm border-b border-gray-200/80 px-5 pt-4 pb-4 sticky top-0 z-10 shadow-sm">
 
         {/* Title row */}
         <div className="flex items-start justify-between mb-4">
@@ -476,7 +476,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
           <div className="relative ml-3 flex-shrink-0" ref={meerActiesRef}>
             <button
               onClick={() => setShowMeerActies(!showMeerActies)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium whitespace-nowrap shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm active:scale-[0.97] transition-all duration-150 font-medium whitespace-nowrap shadow-sm"
             >
               Meer acties
               <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showMeerActies ? "rotate-180" : ""}`} viewBox="0 0 14 14" fill="none">
@@ -484,7 +484,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
               </svg>
             </button>
             {showMeerActies && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-gray-200 shadow-lg z-30 py-1 overflow-hidden">
+              <div className="animate-slideDown absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl border border-gray-200 shadow-xl z-30 py-1 overflow-hidden">
                 <button
                   onClick={() => { setShowFaseModal(true); setShowMeerActies(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
@@ -571,7 +571,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
           {/* Huidige fase */}
-          <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="col-span-2 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Huidige fase</p>
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${currentFaseColor.bg} shadow-sm`}>
@@ -587,7 +587,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
           </div>
 
           {/* Resterende tijd */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Resterende tijd</p>
             {daysToActie !== null ? (
               <>
@@ -604,7 +604,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
           </div>
 
           {/* Beslistermijn */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Beslistermijn</p>
             {daysToBeslistermijn !== null ? (
               <>
@@ -627,7 +627,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
             { label: "Actiedatum",      value: formatDate(zaak.actiedatum)     },
             { label: "Hoorzitting",     value: formatDate(zaak.datumHoorzitting) },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-sm">
+            <div key={label} className="bg-white rounded-2xl border border-gray-100 p-3.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
               <p className="text-sm font-semibold text-gray-800">{value || "—"}</p>
             </div>
@@ -635,7 +635,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
         </div>
 
         {/* Volgende actie */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Volgende actie</p>
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
@@ -653,16 +653,16 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
         </div>
 
         {/* Beschikbare acties */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
           <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
         </div>
 
         {/* Zaakgegevens collapsible */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <button
             onClick={() => setShowZaakgegevens(!showZaakgegevens)}
-            className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
           >
             <span className="flex items-center gap-2">
               <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none">
@@ -720,7 +720,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
       {/* ── Delete confirmation modal ─────────────────────────────── */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+          <div className="animate-fadeUp bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mb-4">
               <svg className="w-5 h-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -733,7 +733,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
             <div className="flex gap-2">
               <button
                 onClick={() => { onDelete?.(zaak.id); setShowDeleteConfirm(false); }}
-                className="flex-1 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
+                className="flex-1 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.97] transition-all shadow-sm"
               >
                 Ja, verwijderen
               </button>
@@ -751,7 +751,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
       {/* ── Fase modal ────────────────────────────────────────────── */}
       {showFaseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} onClick={() => setShowFaseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="animate-fadeUp bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-sm font-bold text-gray-900 mb-1">Fase handmatig wijzigen</h2>
             <p className="text-xs text-gray-400 mb-4">Huidige fase: <span className="font-semibold text-gray-700">{zaak.fase}</span></p>
             <div className="space-y-1.5">
@@ -790,7 +790,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
       {/* ── Export modal ──────────────────────────────────────────── */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} onClick={() => setShowExportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="animate-fadeUp bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-900">Zaak exporteren</h2>
               <button onClick={() => setShowExportModal(false)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
@@ -1023,8 +1023,8 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
             <button
               key={i}
               onClick={a.onClick}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all group text-left ${
-                a.done ? "hover:bg-emerald-50" : "hover:bg-gray-50"
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-150 group text-left active:scale-[0.98] ${
+                a.done ? "hover:bg-emerald-50 hover:shadow-sm" : "hover:bg-gray-50 hover:shadow-sm"
               }`}
             >
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${a.iconBg}`}>
@@ -1201,7 +1201,7 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
           style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
           onClick={() => setShowHelpModal(false)}
         >
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="animate-fadeUp bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowHelpModal(false)}
               className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
@@ -1304,7 +1304,7 @@ function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdat
   return (
     <button
       onClick={handleClick}
-      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.97] ${
+      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.96] hover:-translate-y-0.5 hover:shadow-md ${
         clicked ? "bg-emerald-50 border-emerald-300 text-emerald-700" : s.base
       }`}
     >
