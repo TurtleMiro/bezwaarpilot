@@ -612,14 +612,21 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
 
 function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
   const { updateCase } = useCases();
-  const [showNoteForm, setShowNoteForm]   = useState(false);
-  const [noteInput, setNoteInput]         = useState("");
-  const [showHelpModal, setShowHelpModal] = useState(false);
-  const [actionChecked, setActionChecked] = useState(false);
-  const [reminderSent, setReminderSent]   = useState(false);
-  const fileInputRef                      = useRef<HTMLInputElement>(null);
+  const [showNoteForm, setShowNoteForm]         = useState(false);
+  const [noteInput, setNoteInput]               = useState("");
+  const [showCategorieForm, setShowCategorieForm] = useState(false);
+  const [categorieSelected, setCategorieSelected] = useState<string | null>(null);
+  const [categorieNote, setCategorieNote]         = useState("");
+  const [showHelpModal, setShowHelpModal]       = useState(false);
+  const [actionChecked, setActionChecked]       = useState(false);
+  const [reminderSent, setReminderSent]         = useState(false);
+  const fileInputRef                            = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setActionChecked(false); setShowNoteForm(false); setNoteInput(""); }, [zaak.id]);
+  useEffect(() => {
+    setActionChecked(false);
+    setShowNoteForm(false); setNoteInput("");
+    setShowCategorieForm(false); setCategorieSelected(null); setCategorieNote("");
+  }, [zaak.id]);
 
   const currentFaseColor = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
 
@@ -642,6 +649,21 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     setShowNoteForm(false);
   }
 
+  function handleCategorieSubmit() {
+    if (!categorieSelected) return;
+    const ts      = new Date().toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const entry   = categorieNote.trim()
+      ? `[${ts}] Reactie: ${categorieSelected} — ${categorieNote.trim()}`
+      : `[${ts}] Reactie: ${categorieSelected}`;
+    const newNote = zaak.aantekeningen ? `${zaak.aantekeningen}\n\n${entry}` : entry;
+    const updated = { ...zaak, aantekeningen: newNote };
+    updateCase(updated);
+    onUpdate({ aantekeningen: newNote });
+    setCategorieSelected(null);
+    setCategorieNote("");
+    setShowCategorieForm(false);
+  }
+
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -662,16 +684,16 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     },
     {
       label: "Reactie categoriseren",
-      onClick: () => setShowNoteForm(!showNoteForm),
-      done: false,
+      onClick: () => { setShowCategorieForm(!showCategorieForm); setShowNoteForm(false); },
+      done: showCategorieForm,
       iconBg: "bg-orange-100",
       iconColor: "text-orange-500",
       icon: <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />,
     },
     {
       label: "Notitie toevoegen",
-      onClick: () => setShowNoteForm(!showNoteForm),
-      done: false,
+      onClick: () => { setShowNoteForm(!showNoteForm); setShowCategorieForm(false); },
+      done: showNoteForm,
       iconBg: "bg-purple-100",
       iconColor: "text-purple-500",
       icon: <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />,
@@ -758,6 +780,46 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
           ))}
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.jpg,.png" />
         </div>
+
+        {/* Categorie form */}
+        {showCategorieForm && (
+          <div className="mt-2 p-3 bg-orange-50 border border-orange-100 rounded-xl">
+            <p className="text-[11px] font-semibold text-orange-700 mb-2">Selecteer een categorie</p>
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              {["Akkoord", "Gedeeltelijk akkoord", "Niet akkoord", "Meer info nodig"].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategorieSelected(categorieSelected === cat ? null : cat)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all text-left leading-tight ${
+                    categorieSelected === cat
+                      ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:text-orange-600"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={categorieNote}
+              onChange={(e) => setCategorieNote(e.target.value)}
+              placeholder="Optionele toelichting..."
+              className="w-full rounded-lg border border-orange-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 min-h-[48px] resize-none transition-all placeholder:text-gray-400"
+            />
+            <div className="flex gap-2 mt-1.5">
+              <button
+                onClick={handleCategorieSubmit}
+                disabled={!categorieSelected}
+                className="px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Opslaan
+              </button>
+              <button onClick={() => { setShowCategorieForm(false); setCategorieSelected(null); setCategorieNote(""); }} className="px-3 py-1.5 rounded-lg text-gray-500 hover:bg-white text-xs transition-colors">
+                Annuleren
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Inline note form */}
         {showNoteForm && (
