@@ -829,23 +829,64 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
 
 function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
   const { updateCase } = useCases();
-  const [showNoteForm, setShowNoteForm]         = useState(false);
-  const [noteInput, setNoteInput]               = useState("");
+  const [showNoteForm, setShowNoteForm]           = useState(false);
+  const [noteInput, setNoteInput]                 = useState("");
   const [showCategorieForm, setShowCategorieForm] = useState(false);
   const [categorieSelected, setCategorieSelected] = useState<string | null>(null);
   const [categorieNote, setCategorieNote]         = useState("");
-  const [showHelpModal, setShowHelpModal]       = useState(false);
-  const [actionChecked, setActionChecked]       = useState(false);
-  const [reminderSent, setReminderSent]         = useState(false);
-  const fileInputRef                            = useRef<HTMLInputElement>(null);
+  const [showHelpModal, setShowHelpModal]         = useState(false);
+  const [actionChecked, setActionChecked]         = useState(false);
+  const [reminderSent, setReminderSent]           = useState(false);
+  const [aiMessages, setAiMessages]               = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [aiInput, setAiInput]                     = useState("");
+  const [aiLoading, setAiLoading]                 = useState(false);
+  const fileInputRef                              = useRef<HTMLInputElement>(null);
+  const aiEndRef                                  = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setActionChecked(false);
     setShowNoteForm(false); setNoteInput("");
     setShowCategorieForm(false); setCategorieSelected(null); setCategorieNote("");
+    setAiMessages([]); setAiInput("");
   }, [zaak.id]);
 
+  useEffect(() => {
+    aiEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [aiMessages]);
+
   const currentFaseColor = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
+
+  async function sendToAI() {
+    const msg = aiInput.trim();
+    if (!msg || aiLoading) return;
+    const updated = [...aiMessages, { role: "user" as const, text: msg }];
+    setAiMessages(updated);
+    setAiInput("");
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: msg,
+          history: aiMessages,
+          caseContext: {
+            zaaknummer: zaak.zaaknummer,
+            bezwaarmaker: zaak.bezwaarmaker,
+            fase: zaak.fase,
+            volgendeActie: zaak.volgendeActie,
+            aantekeningen: zaak.aantekeningen,
+          },
+        }),
+      });
+      const data = await res.json();
+      setAiMessages([...updated, { role: "ai", text: data.reply ?? data.error ?? "Er is een fout opgetreden." }]);
+    } catch {
+      setAiMessages([...updated, { role: "ai", text: "Verbindingsfout. Probeer het opnieuw." }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   function handleReminder() {
     const subject = encodeURIComponent(`Reminder: ${zaak.zaaknummer} – ${zaak.bezwaarmaker}`);
@@ -1065,16 +1106,73 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
         )}
       </div>
 
-      {/* Help nodig */}
-      <div className="px-4 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50/60">
-        <p className="text-xs font-bold text-gray-700 mb-1">Help nodig?</p>
-        <p className="text-xs text-gray-400 mb-2 leading-relaxed">Bekijk uitleg over het proces en de huidige stap.</p>
-        <button
-          onClick={() => setShowHelpModal(true)}
-          className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors"
-        >
-          Stuur afvraag →
-        </button>
+      {/* AI Chat */}
+      <div className="border-t border-gray-100 flex flex-col flex-shrink-0">
+        <div className="px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">AI Chat</p>
+          <button
+            onClick={() => setShowHelpModal(true)}
+            className="text-[11px] text-blue-500 hover:text-blue-700 font-medium transition-colors"
+          >
+            Fase-uitleg →
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="overflow-y-auto px-4 space-y-2" style={{ maxHeight: "160px", minHeight: "56px" }}>
+          {aiMessages.length === 0 && (
+            <p className="text-[11px] text-gray-400 leading-relaxed pb-1">
+              Stel een vraag, vraag om een conceptbrief, of laat de AI de zaak samenvatten.
+            </p>
+          )}
+          {aiMessages.map((m, i) => (
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[92%] px-2.5 py-1.5 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                m.role === "user"
+                  ? "bg-blue-600 text-white rounded-br-sm"
+                  : "bg-gray-100 text-gray-700 rounded-bl-sm"
+              }`}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {aiLoading && (
+            <div className="flex justify-start pb-1">
+              <div className="bg-gray-100 px-3 py-2 rounded-xl rounded-bl-sm">
+                <div className="flex gap-1 items-center">
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={aiEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="px-3 py-2.5 border-t border-gray-100 flex-shrink-0">
+          <div className="flex gap-2 items-end">
+            <textarea
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendToAI(); } }}
+              placeholder="Stel een vraag..."
+              rows={1}
+              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none transition-all placeholder:text-gray-400"
+              style={{ maxHeight: "80px" }}
+            />
+            <button
+              onClick={sendToAI}
+              disabled={!aiInput.trim() || aiLoading}
+              className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Help modal */}
