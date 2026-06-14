@@ -840,8 +840,24 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   const [aiMessages, setAiMessages]               = useState<{ role: "user" | "ai"; text: string }[]>([]);
   const [aiInput, setAiInput]                     = useState("");
   const [aiLoading, setAiLoading]                 = useState(false);
+  const [chatHeight, setChatHeight]               = useState(240);
   const fileInputRef                              = useRef<HTMLInputElement>(null);
   const aiEndRef                                  = useRef<HTMLDivElement>(null);
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = chatHeight;
+    function onMove(ev: MouseEvent) {
+      setChatHeight(Math.max(120, Math.min(520, startH + (startY - ev.clientY))));
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
 
   useEffect(() => {
     setActionChecked(false);
@@ -1096,6 +1112,14 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
 
       {/* AI Chat */}
       <div className="border-t border-gray-100 flex flex-col flex-shrink-0">
+        {/* Resize handle */}
+        <div
+          onMouseDown={startResize}
+          className="h-3 flex items-center justify-center cursor-row-resize hover:bg-blue-50 transition-colors group flex-shrink-0"
+          title="Slepen om formaat aan te passen"
+        >
+          <div className="w-8 h-0.5 bg-gray-200 group-hover:bg-blue-300 rounded-full transition-colors" />
+        </div>
         <div className="px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1114,7 +1138,7 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
         </div>
 
         {/* Messages */}
-        <div className="overflow-y-auto px-4 space-y-2" style={{ maxHeight: "160px", minHeight: "56px" }}>
+        <div className="overflow-y-auto px-4 space-y-2" style={{ height: chatHeight + "px" }}>
           {aiMessages.length === 0 && (
             <p className="text-[11px] text-gray-400 leading-relaxed pb-1">
               Stel een vraag, vraag om een conceptbrief, of laat de AI de zaak samenvatten.
