@@ -6,12 +6,20 @@ import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
 import { formatDate, isOverdue, isDueSoon, todayISO, addWeeks } from "@/lib/dateUtils";
 
+const FASE_ICONS: Record<string, JSX.Element> = {
+  Intake:      <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />,
+  Informeel:   <path d="M18 10c0 3.866-3.582 7-8 7a8.96 8.96 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" />,
+  Hoorzitting: <><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" /></>,
+  Advies:      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />,
+  Afronding:   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />,
+};
+
 const FASE_TABS = [
-  { key: "Intake",       label: "Intake",       bg: "bg-blue-500",    pill: "bg-blue-600 text-white"    },
-  { key: "Informeel",   label: "Informeel",    bg: "bg-orange-500",  pill: "bg-orange-500 text-white"  },
-  { key: "Hoorzitting", label: "Hoorzitting",  bg: "bg-purple-500",  pill: "bg-purple-600 text-white"  },
-  { key: "Advies",      label: "Advies",       bg: "bg-emerald-500", pill: "bg-emerald-600 text-white" },
-  { key: "Afronding",   label: "Afronding",    bg: "bg-slate-500",   pill: "bg-slate-600 text-white"   },
+  { key: "Intake",       label: "Intake",                bg: "bg-blue-500",    pill: "bg-blue-600 text-white",    inactive: "text-gray-600 hover:bg-blue-50 hover:text-blue-700"    },
+  { key: "Informeel",   label: "Inform. afhandeling",  bg: "bg-orange-500",  pill: "bg-orange-500 text-white",  inactive: "text-gray-600 hover:bg-orange-50 hover:text-orange-700"  },
+  { key: "Hoorzitting", label: "Hoorzitting",           bg: "bg-purple-500",  pill: "bg-purple-600 text-white",  inactive: "text-gray-600 hover:bg-purple-50 hover:text-purple-700"  },
+  { key: "Advies",      label: "Advies",                bg: "bg-emerald-500", pill: "bg-emerald-600 text-white", inactive: "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700" },
+  { key: "Afronding",   label: "Afronding",             bg: "bg-slate-500",   pill: "bg-slate-600 text-white",   inactive: "text-gray-600 hover:bg-slate-50 hover:text-slate-700"   },
 ];
 
 const FASE_STEPS = ["Intake", "Informeel", "Hoorzitting", "Advies", "Afronding"];
@@ -102,7 +110,7 @@ function DashboardContent() {
         </div>
 
         {/* Phase filter tabs */}
-        <div className="hidden md:flex flex-1 items-center gap-1">
+        <div className="hidden md:flex flex-1 items-center gap-1.5">
           {FASE_TABS.map((tab) => {
             const active = faseFilter === tab.key;
             const count  = faseCounts[tab.key] ?? 0;
@@ -110,14 +118,19 @@ function DashboardContent() {
               <button
                 key={tab.key}
                 onClick={() => { setFaseFilter(active ? "Alle" : tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
-                  active ? `${tab.pill} shadow-sm` : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border ${
+                  active
+                    ? `${tab.pill} border-transparent shadow-sm`
+                    : `bg-white ${tab.inactive} border-gray-200`
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                  active ? "bg-white/25 text-white" : `${tab.bg} text-white`
-                }`}>{count}</span>
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  {FASE_ICONS[tab.key]}
+                </svg>
                 {tab.label}
+                <span className={`ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  active ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+                }`}>{count}</span>
               </button>
             );
           })}
@@ -410,18 +423,20 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
             const color   = FASE_COLORS[fase] ?? FASE_COLORS.Intake;
             return (
               <div key={fase} className="flex items-center flex-1 min-w-0">
-                <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+                <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
                     done    ? "bg-emerald-500 border-emerald-500 shadow-sm"
                     : current ? `${color.bg} border-transparent shadow-md ring-4 ${color.ring}`
-                    : "bg-white border-gray-200"
+                    : "bg-gray-50 border-gray-200"
                   }`}>
                     {done ? (
-                      <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 14 14" fill="currentColor">
-                        <path fillRule="evenodd" d="M11.78 3.72a.75.75 0 010 1.06l-5.5 5.5a.75.75 0 01-1.06 0L1.72 6.78a.75.75 0 011.06-1.06L5.75 8.19l4.97-4.47a.75.75 0 011.06 0z" />
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     ) : (
-                      <span className={`text-xs font-bold ${current ? "text-white" : "text-gray-300"}`}>{i + 1}</span>
+                      <svg className={`w-4 h-4 ${current ? "text-white" : "text-gray-300"}`} viewBox="0 0 20 20" fill="currentColor">
+                        {FASE_ICONS[fase]}
+                      </svg>
                     )}
                   </div>
                   <span className={`text-[10px] font-semibold whitespace-nowrap ${
@@ -429,7 +444,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack }: { zaak: Case; 
                   }`}>{fase}</span>
                 </div>
                 {i < FASE_STEPS.length - 1 && (
-                  <div className={`h-px flex-1 mx-2 mb-4 ${i < faseIndex ? "bg-emerald-300" : "bg-gray-200"}`} />
+                  <div className={`h-px flex-1 mx-2 mb-5 ${i < faseIndex ? "bg-emerald-300" : "bg-gray-200"}`} />
                 )}
               </div>
             );
@@ -637,10 +652,40 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   }
 
   const snelleActies = [
-    { label: reminderSent ? "E-mail geopend ✓" : "Herinnering naar aanvrager", onClick: handleReminder, done: reminderSent },
-    { label: "Reactie categoriseren",  onClick: () => setShowNoteForm(!showNoteForm), done: false },
-    { label: "Notitie toevoegen",      onClick: () => setShowNoteForm(!showNoteForm), done: false },
-    { label: zaak.uploadedBezwaarFileName ? `✓ ${zaak.uploadedBezwaarFileName}` : "Document uploaden", onClick: () => fileInputRef.current?.click(), done: !!zaak.uploadedBezwaarFileName },
+    {
+      label: reminderSent ? "E-mail geopend" : "Herinnering naar aanvrager",
+      onClick: handleReminder,
+      done: reminderSent,
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-500",
+      icon: <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />,
+    },
+    {
+      label: "Reactie categoriseren",
+      onClick: () => setShowNoteForm(!showNoteForm),
+      done: false,
+      iconBg: "bg-orange-100",
+      iconColor: "text-orange-500",
+      icon: <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />,
+    },
+    {
+      label: "Notitie toevoegen",
+      onClick: () => setShowNoteForm(!showNoteForm),
+      done: false,
+      iconBg: "bg-purple-100",
+      iconColor: "text-purple-500",
+      icon: <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />,
+    },
+    {
+      label: zaak.uploadedBezwaarFileName ? zaak.uploadedBezwaarFileName : "Document uploaden",
+      onClick: () => fileInputRef.current?.click(),
+      done: !!zaak.uploadedBezwaarFileName,
+      iconBg: zaak.uploadedBezwaarFileName ? "bg-emerald-100" : "bg-gray-100",
+      iconColor: zaak.uploadedBezwaarFileName ? "text-emerald-500" : "text-gray-500",
+      icon: zaak.uploadedBezwaarFileName
+        ? <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        : <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />,
+    },
   ];
 
   return (
@@ -689,16 +734,23 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
       {/* Snelle acties */}
       <div className="px-4 py-3 flex-1">
         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Snelle acties</p>
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {snelleActies.map((a, i) => (
             <button
               key={i}
               onClick={a.onClick}
-              className={`w-full flex items-center justify-between text-xs px-2.5 py-2 rounded-xl transition-all group text-left ${
-                a.done ? "text-emerald-600 font-medium hover:bg-emerald-50" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all group text-left ${
+                a.done ? "hover:bg-emerald-50" : "hover:bg-gray-50"
               }`}
             >
-              <span>{a.label}</span>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${a.iconBg}`}>
+                <svg className={`w-3.5 h-3.5 ${a.iconColor}`} viewBox="0 0 20 20" fill="currentColor">
+                  {a.icon}
+                </svg>
+              </div>
+              <span className={`flex-1 text-xs font-medium ${a.done ? "text-emerald-600" : "text-gray-700 group-hover:text-gray-900"}`}>
+                {a.label}
+              </span>
               <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${a.done ? "text-emerald-400" : "text-gray-300 group-hover:text-gray-500"}`} viewBox="0 0 14 14" fill="none">
                 <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
