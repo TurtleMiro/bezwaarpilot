@@ -971,18 +971,6 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   return (
     <div className="flex flex-col h-full">
 
-      {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm flex-shrink-0">
-            <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a4 4 0 00-4 4c0 1.49.82 2.79 2.03 3.47L5.5 14h5l-.53-5.53A4 4 0 008 1z" />
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-gray-900">AI Assistent</span>
-        </div>
-      </div>
-
       {/* Huidige fase */}
       <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Huidige fase</p>
@@ -1108,8 +1096,15 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
 
       {/* AI Chat */}
       <div className="border-t border-gray-100 flex flex-col flex-shrink-0">
-        <div className="px-4 py-2.5 flex items-center justify-between flex-shrink-0">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">AI Chat</p>
+        <div className="px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm flex-shrink-0">
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a4 4 0 00-4 4c0 1.49.82 2.79 2.03 3.47L5.5 14h5l-.53-5.53A4 4 0 008 1z" />
+              </svg>
+            </div>
+            <span className="text-xs font-bold text-gray-800">AI Assistent</span>
+          </div>
           <button
             onClick={() => setShowHelpModal(true)}
             className="text-[11px] text-blue-500 hover:text-blue-700 font-medium transition-colors"
