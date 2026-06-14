@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
@@ -279,11 +279,77 @@ function DashboardContent() {
 
 // ─── Case detail panel ────────────────────────────────────────────────────────
 
+const FASE_UITLEG: Record<string, { steps: string[]; tip: string }> = {
+  Intake: {
+    steps: [
+      "Controleer of het bezwaar tijdig en volledig is ingediend.",
+      "Stuur een ontvangstbevestiging aan de bezwaarmaker.",
+      "Is het bezwaar onvolledig? Stuur een herstelverzuimbrief.",
+      "Ontvang het herstel en ga door naar de informele fase.",
+    ],
+    tip: "De bezwaartermijn is 6 weken na de besluitdatum. Controleer dit altijd als eerste.",
+  },
+  Informeel: {
+    steps: [
+      "Neem contact op met de vakafdeling voor een informele reactie.",
+      "Stuur zo nodig een reminder als er geen reactie komt.",
+      "Beoordeel de reactie van de vakafdeling.",
+      "Geslaagd? Sluit informeel af. Niet geslaagd? Plan een zitting.",
+    ],
+    tip: "Informele afhandeling bespaart tijd voor alle partijen. Probeer dit altijd eerst.",
+  },
+  Hoorzitting: {
+    steps: [
+      "Plan een datum voor de hoorzitting.",
+      "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.",
+      "Bereid de hoorzitting voor met het procesdossier.",
+      "Houd de hoorzitting en leg het verslag vast.",
+    ],
+    tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd.",
+  },
+  Zitting: {
+    steps: [
+      "Plan een datum voor de hoorzitting.",
+      "Stuur uitnodigingen aan bezwaarmaker en vakafdeling.",
+      "Bereid de hoorzitting voor met het procesdossier.",
+      "Houd de hoorzitting en leg het verslag vast.",
+    ],
+    tip: "Zorg dat uitnodigingen minimaal 2 weken van tevoren worden verstuurd.",
+  },
+  Advies: {
+    steps: [
+      "Schrijf het conceptadvies op basis van de hoorzitting.",
+      "Laat het conceptadvies controleren.",
+      "Stuur het definitieve advies naar het bestuursorgaan.",
+    ],
+    tip: "Het advies moet binnen de beslistermijn verstuurd worden.",
+  },
+  Afronding: {
+    steps: [
+      "Wacht op de beslissing op bezwaar van het bestuursorgaan.",
+      "Ontvang en registreer de beslissing.",
+      "Sluit de zaak af in het systeem.",
+    ],
+    tip: "Bewaar alle documenten zorgvuldig voor het archief.",
+  },
+};
+
 function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
   const { updateCase } = useCases();
-  const [zaak, setZaak]                     = useState<Case>(initialZaak);
-  const [saved, setSaved]                   = useState(false);
+  const [zaak, setZaak]                         = useState<Case>(initialZaak);
+  const [saved, setSaved]                       = useState(false);
   const [showZaakgegevens, setShowZaakgegevens] = useState(false);
+  const [showNoteForm, setShowNoteForm]         = useState(false);
+  const [noteInput, setNoteInput]               = useState("");
+  const [showHelpModal, setShowHelpModal]       = useState(false);
+  const [actionChecked, setActionChecked]       = useState(false);
+  const [reminderSent, setReminderSent]         = useState(false);
+  const fileInputRef                            = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setActionChecked(false);
+    setShowNoteForm(false);
+  }, [initialZaak.id]);
 
   useEffect(() => { setZaak(initialZaak); }, [initialZaak.id]);
 
@@ -318,6 +384,42 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
     updateCase(zaak);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handleNoteSubmit() {
+    if (!noteInput.trim()) return;
+    const timestamp = new Date().toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const newNote = zaak.aantekeningen
+      ? `${zaak.aantekeningen}\n\n[${timestamp}] ${noteInput.trim()}`
+      : `[${timestamp}] ${noteInput.trim()}`;
+    const updated = { ...zaak, aantekeningen: newNote };
+    setZaak(updated);
+    updateCase(updated);
+    setNoteInput("");
+    setShowNoteForm(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handleReminder() {
+    const subject = encodeURIComponent(`Reminder: ${zaak.zaaknummer} – ${zaak.bezwaarmaker}`);
+    const body = encodeURIComponent(
+      `Beste,\n\nHierbij een herinnering betreffende de volgende bezwaarzaak:\n\nZaaknummer: ${zaak.zaaknummer}\nBezwaarmaker: ${zaak.bezwaarmaker}\nHuidige fase: ${zaak.fase}\nActie vereist: ${zaak.volgendeActie}\nActiedatum: ${formatDate(zaak.actiedatum)}\n\nGraag uw reactie voor bovenstaande datum.\n\nMet vriendelijke groet,\nBezwaarPilot`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    setReminderSent(true);
+    setTimeout(() => setReminderSent(false), 3000);
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const updated = { ...zaak, uploadedBezwaarFileName: file.name };
+    setZaak(updated);
+    updateCase(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+    e.target.value = "";
   }
 
   const faseIndex          = FASE_STEPS.indexOf(zaak.fase);
@@ -585,7 +687,7 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
                 </div>
                 <span className="text-sm font-semibold text-gray-900">AI Assistent</span>
               </div>
-              <span className="text-gray-300 text-base">···</span>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Binnenkort</span>
             </div>
             <div className="mb-3">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Huidige fase</p>
@@ -594,9 +696,19 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
               </div>
             </div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Actie vereist</p>
-            <label className="flex items-start gap-2 cursor-pointer group">
-              <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-blue-600" readOnly />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900 leading-relaxed transition-colors">{zaak.volgendeActie || "—"}</span>
+            <label className="flex items-start gap-2 cursor-pointer group" onClick={() => setActionChecked(!actionChecked)}>
+              <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+                actionChecked ? "bg-blue-600 border-blue-600" : "border-gray-300 group-hover:border-blue-400"
+              }`}>
+                {actionChecked && (
+                  <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.5 2.5a.75.75 0 010 1.06l-4 4a.75.75 0 01-1.06 0l-1.5-1.5a.75.75 0 011.06-1.06L4 6l3.47-3.47a.75.75 0 011.03-.03z" />
+                  </svg>
+                )}
+              </div>
+              <span className={`text-xs leading-relaxed transition-colors ${actionChecked ? "line-through text-gray-400" : "text-gray-600 group-hover:text-gray-900"}`}>
+                {zaak.volgendeActie || "—"}
+              </span>
             </label>
           </div>
 
@@ -604,23 +716,87 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2.5">Snelle acties</p>
             <div className="space-y-0.5">
-              {[
-                { label: "Reminder sturen naar vakafdeling", icon: "→" },
-                { label: "Reactie toelichten",               icon: "✎" },
-                { label: "Notitie toevoegen",                icon: "+" },
-                { label: "Document uploaden",                icon: "↑" },
-              ].map((action, i) => (
+
+              {/* Reminder */}
+              <button
+                onClick={handleReminder}
+                className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
+              >
+                <span className={reminderSent ? "text-emerald-600 font-medium" : ""}>
+                  {reminderSent ? "E-mail geopend ✓" : "Reminder sturen naar vakafdeling"}
+                </span>
+                <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" viewBox="0 0 14 14" fill="none">
+                  <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+
+              {/* Reactie toelichten / Notitie toevoegen */}
+              {["Reactie toelichten", "Notitie toevoegen"].map((label) => (
                 <button
-                  key={i}
+                  key={label}
+                  onClick={() => setShowNoteForm(!showNoteForm)}
                   className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
                 >
-                  <span>{action.label}</span>
-                  <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" viewBox="0 0 14 14" fill="none">
+                  <span>{label}</span>
+                  <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-all duration-150 ${showNoteForm ? "rotate-90 text-blue-400" : "text-gray-300 group-hover:text-gray-500"}`} viewBox="0 0 14 14" fill="none">
                     <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 </button>
               ))}
+
+              {/* Inline note form */}
+              {showNoteForm && (
+                <div className="pt-1 pb-1">
+                  <textarea
+                    autoFocus
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    placeholder="Typ uw notitie..."
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 min-h-[72px] resize-none transition-all"
+                    onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) handleNoteSubmit(); }}
+                  />
+                  <div className="flex gap-2 mt-1.5">
+                    <button
+                      onClick={handleNoteSubmit}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      Opslaan
+                    </button>
+                    <button
+                      onClick={() => { setShowNoteForm(false); setNoteInput(""); }}
+                      className="px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 text-xs transition-colors"
+                    >
+                      Annuleren
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Document uploaden */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2.5 py-2 rounded-xl transition-all duration-150 text-left group"
+              >
+                <span>
+                  {zaak.uploadedBezwaarFileName
+                    ? <span className="text-emerald-600 font-medium truncate">✓ {zaak.uploadedBezwaarFileName}</span>
+                    : "Document uploaden"
+                  }
+                </span>
+                <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" viewBox="0 0 14 14" fill="none">
+                  <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.jpg,.png" />
             </div>
+
+            {/* Notes preview */}
+            {zaak.aantekeningen && (
+              <div className="mt-3 pt-3 border-t border-gray-50">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Aantekeningen</p>
+                <p className="text-xs text-gray-500 whitespace-pre-wrap leading-relaxed line-clamp-4">{zaak.aantekeningen}</p>
+              </div>
+            )}
           </div>
 
           {/* Help */}
@@ -634,12 +810,77 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate }: { zaak: Case; onUpdate
             <p className="text-xs text-blue-600/70 mb-2.5 leading-relaxed">
               Bekijk uitleg over deze stap en het proces.
             </p>
-            <button className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors">
+            <button
+              onClick={() => setShowHelpModal(true)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors"
+            >
               Open uitleg →
             </button>
           </div>
         </div>
       </div>
+
+      {/* Help modal */}
+      {showHelpModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowHelpModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowHelpModal(false)}
+              className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${currentFaseColor.bg} shadow-sm`}>
+                <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Fase: {zaak.fase}</h2>
+                <p className="text-xs text-gray-400">Stap-voor-stap uitleg</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 mb-4">
+              {(FASE_UITLEG[zaak.fase]?.steps ?? []).map((step, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold text-white ${currentFaseColor.bg}`}>
+                    {i + 1}
+                  </div>
+                  <p className="text-xs text-gray-700 leading-relaxed">{step}</p>
+                </div>
+              ))}
+            </div>
+
+            {FASE_UITLEG[zaak.fase]?.tip && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  <span className="font-semibold">Tip: </span>
+                  {FASE_UITLEG[zaak.fase].tip}
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowHelpModal(false)}
+              className="mt-4 w-full py-2 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700 transition-colors"
+            >
+              Sluiten
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
