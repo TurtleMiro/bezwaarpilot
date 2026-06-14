@@ -231,7 +231,7 @@ function DashboardContent() {
 
           {/* Case list */}
           <div className="flex-1 overflow-y-auto">
-            {filtered.map((c) => {
+            {filtered.map((c, idx) => {
               const days    = daysUntil(c.actiedatum);
               const overdue = days !== null && days < 0;
               const soon    = days !== null && days >= 0 && days <= 2;
@@ -240,12 +240,13 @@ function DashboardContent() {
                 <button
                   key={c.id}
                   onClick={() => { setSelectedId(c.id); setMobileShowDetail(true); }}
-                  className={`w-full text-left px-3 py-3 border-b border-white/5 transition-all duration-200 relative ${
-                    active ? "bg-white/12 shadow-inner" : "hover:bg-white/7"
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                  className={`animate-fadeUp w-full text-left px-3 py-3 border-b border-white/5 transition-all duration-200 relative ${
+                    active ? "bg-white/12" : "hover:bg-white/7"
                   }`}
                 >
-                  <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full transition-all ${
-                    overdue ? "bg-red-500" : soon ? "bg-amber-400" : active ? "bg-blue-400" : "bg-transparent"
+                  <div className={`absolute left-0 top-2 bottom-2 rounded-r-full transition-all duration-300 ${
+                    overdue ? "w-1 bg-red-500" : soon ? "w-1 bg-amber-400" : active ? "w-1 bg-blue-400" : "w-0 bg-transparent"
                   }`} />
                   <div className="flex items-center justify-between mb-0.5 pl-2">
                     <span className={`text-xs font-bold ${active ? "text-white" : "text-gray-300"}`}>{c.zaaknummer}</span>
