@@ -1,0 +1,19 @@
+{
+  "name": "BezwaarPilot",
+  "short_name": "BezwaarPilot",
+  "description": "Workflow dashboard voor bezwaarzaken",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
