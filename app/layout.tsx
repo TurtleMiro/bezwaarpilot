@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SwRegister from "./sw-register";
+import AuthSessionProvider from "./session-provider";
 
 export const metadata: Metadata = {
   title: "BezwaarPilot",
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body className="h-full bg-white overflow-hidden">
-        {children}
+        <AuthSessionProvider>
+          {children}
+        </AuthSessionProvider>
         <SwRegister />
       </body>
     </html>
