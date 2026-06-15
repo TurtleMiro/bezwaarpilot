@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
@@ -84,11 +84,7 @@ function detectRepresentative(extracted: ExtractedData): RepresentativeInfo | nu
   const name = extracted.gemachtigde;
   const lower = name.toLowerCase();
   const isAdvocaat = lower.includes("advocat") || lower.includes("mr.") || lower.includes("mr ");
-  return {
-    name,
-    type: isAdvocaat ? "advocaat" : "onzeker",
-    authorizationFound: false,
-  };
+  return { name, type: isAdvocaat ? "advocaat" : "onzeker", authorizationFound: false };
 }
 
 // ─── Document templates ───────────────────────────────────────────────────────
@@ -140,6 +136,48 @@ Met vriendelijke groet,
 Commissie Bezwaarschriften`;
 }
 
+// ─── Document viewer ──────────────────────────────────────────────────────────
+
+function DocumentViewer({ file, objectUrl }: { file: File; objectUrl: string }) {
+  const isPdf = file.name.toLowerCase().endsWith(".pdf");
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col" style={{ minHeight: 560 }}>
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-shrink-0">
+        <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <path strokeLinecap="round" d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
+          <path strokeLinecap="round" d="M9 2v3h3" />
+        </svg>
+        <span className="text-xs font-semibold text-gray-600 truncate">{file.name}</span>
+        <span className="ml-auto text-[10px] text-gray-400 uppercase tracking-wide flex-shrink-0">
+          {isPdf ? "PDF" : "DOCX"}
+        </span>
+      </div>
+
+      {isPdf ? (
+        <iframe
+          src={objectUrl}
+          className="flex-1 w-full"
+          style={{ minHeight: 520 }}
+          title="Bezwaarschrift preview"
+        />
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-700">{file.name}</p>
+            <p className="text-xs text-gray-400 mt-1">DOCX-bestanden kunnen niet worden weergegeven in de browser.<br />De tekst is geanalyseerd door de AI.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Flow component ───────────────────────────────────────────────────────────
 
 type FlowStep = "idle" | "loading" | "result" | "preview";
@@ -148,9 +186,11 @@ function NieuwBezwaarFlow() {
   const router = useRouter();
   const { addCase } = useCases();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const [step, setStep] = useState<FlowStep>("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedData | null>(null);
   const [awb65, setAwb65] = useState<Awb65Check | null>(null);
@@ -158,6 +198,20 @@ function NieuwBezwaarFlow() {
   const [docType, setDocType] = useState<"ontvangst" | "herstel" | null>(null);
   const [docText, setDocText] = useState("");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
+  }, []);
+
+  function selectFile(f: File) {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(f);
+    objectUrlRef.current = url;
+    setSelectedFile(f);
+    setObjectUrl(url);
+    setError(null);
+    setStep("idle");
+  }
 
   async function handleAnalyze() {
     if (!selectedFile) return;
@@ -239,11 +293,13 @@ function NieuwBezwaarFlow() {
     });
   }
 
+  const isWide = step === "result" || step === "preview";
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
           <button onClick={() => router.push("/")} className="text-sm text-gray-400 hover:text-gray-700 transition-colors">
             ← Terug
           </button>
@@ -256,101 +312,110 @@ function NieuwBezwaarFlow() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-
-        {/* ── Step: idle / loading ─────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <svg className="w-4.5 h-4.5 text-white" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2 12v2.25A1.75 1.75 0 003.75 16h10.5A1.75 1.75 0 0016 14.25V12M9 2v9M6 5l3-3 3 3" />
-              </svg>
+      {/* Upload card — always visible at top */}
+      <div className={`${isWide ? "max-w-7xl" : "max-w-2xl"} mx-auto px-4 pt-6 transition-all`}>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 10v1.5A1.5 1.5 0 003.5 13h9A1.5 1.5 0 0014 11.5V10M8 2v7M5.5 4.5L8 2l2.5 2.5" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">
+                  {selectedFile ? selectedFile.name : "Upload bezwaarschrift"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {selectedFile ? `${(selectedFile.size / 1024).toFixed(0)} KB — klik om ander bestand te kiezen` : "PDF of DOCX — de AI controleert artikel 6:5 Awb"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-base font-bold text-gray-900">Upload bezwaarschrift</h1>
-              <p className="text-xs text-gray-500">PDF of DOCX — de AI controleert artikel 6:5 Awb automatisch</p>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" d="M7 1.5v7M4.5 4L7 1.5 9.5 4M2.5 10v1.5A1.5 1.5 0 004 13h6a1.5 1.5 0 001.5-1.5V10" />
+                </svg>
+                {selectedFile ? "Ander bestand" : "Bestand kiezen"}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) selectFile(f); }}
+                />
+              </label>
+
+              <button
+                onClick={handleAnalyze}
+                disabled={!selectedFile || step === "loading"}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-[0.97] transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {step === "loading" ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0" />
+                    Analyseren...
+                  </>
+                ) : (
+                  "Analyseer bezwaarschrift"
+                )}
+              </button>
             </div>
           </div>
 
-          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-            selectedFile ? "border-blue-300 bg-blue-50" : "border-gray-200 hover:border-blue-200 hover:bg-gray-50"
-          }`}>
-            {selectedFile ? (
-              <div className="text-center">
-                <svg className="w-6 h-6 text-blue-400 mx-auto mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-                <p className="text-sm font-semibold text-blue-700">{selectedFile.name}</p>
-                <p className="text-xs text-blue-500 mt-0.5">Klik om ander bestand te kiezen</p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <svg className="w-7 h-7 text-gray-300 mx-auto mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-                <p className="text-sm font-semibold text-gray-600">Bestand uploaden</p>
-                <p className="text-xs text-gray-400 mt-0.5">PDF of DOCX</p>
-              </div>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) { setSelectedFile(f); setError(null); } }}
-            />
-          </label>
-
           {error && (
-            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+            <div className="mt-3 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
               <p className="text-xs text-red-600">{error}</p>
             </div>
           )}
-
-          <button
-            onClick={handleAnalyze}
-            disabled={!selectedFile || step === "loading"}
-            className="w-full py-3 rounded-2xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {step === "loading" ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0" />
-                Bezwaarschrift analyseren...
-              </>
-            ) : (
-              "Analyseer bezwaarschrift"
-            )}
-          </button>
         </div>
-
-        {/* ── Step: result ─────────────────────────────────────────────── */}
-        {step === "result" && awb65 && (
-          <>
-            {/* Article 6:5 Awb check */}
-            <Awb65CheckResult awb65={awb65} />
-
-            {/* Representative block — only if detected */}
-            {rep && <RepresentativeBlock rep={rep} />}
-
-            {/* Conclusion + action */}
-            <ConclusionBlock awb65={awb65} onGenerate={handleGenerate} />
-          </>
-        )}
-
-        {/* ── Step: preview ────────────────────────────────────────────── */}
-        {step === "preview" && (
-          <DocumentPreview
-            docType={docType!}
-            docText={docText}
-            copied={copied}
-            onTextChange={setDocText}
-            onCopy={handleCopy}
-            onSave={handleSaveAndOpen}
-            onBack={() => setStep("result")}
-          />
-        )}
-
       </div>
+
+      {/* Split layout for result / preview */}
+      {(step === "result" || step === "preview") && selectedFile && objectUrl && (
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+
+            {/* Left: document viewer */}
+            <div className="lg:sticky lg:top-20">
+              <DocumentViewer file={selectedFile} objectUrl={objectUrl} />
+            </div>
+
+            {/* Right: check results or document preview */}
+            <div className="space-y-4 pb-8">
+              {step === "result" && awb65 && (
+                <>
+                  <Awb65CheckResult awb65={awb65} />
+                  {rep && <RepresentativeBlock rep={rep} />}
+                  <ConclusionBlock awb65={awb65} onGenerate={handleGenerate} />
+                </>
+              )}
+
+              {step === "preview" && (
+                <DocumentPreview
+                  docType={docType!}
+                  docText={docText}
+                  copied={copied}
+                  onTextChange={setDocText}
+                  onCopy={handleCopy}
+                  onSave={handleSaveAndOpen}
+                  onBack={() => setStep("result")}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading placeholder */}
+      {step === "loading" && (
+        <div className="max-w-2xl mx-auto px-4 py-12 flex flex-col items-center gap-3">
+          <span className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" style={{ borderWidth: 3 }} />
+          <p className="text-sm text-gray-500 font-medium">Bezwaarschrift wordt geanalyseerd…</p>
+          <p className="text-xs text-gray-400">De AI controleert de vereisten van artikel 6:5 Awb</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -359,11 +424,11 @@ function NieuwBezwaarFlow() {
 
 function Awb65CheckResult({ awb65 }: { awb65: Awb65Check }) {
   const checks: { label: string; value: boolean | "uncertain" }[] = [
-    { label: "Naam indiener",              value: awb65.namePresent },
-    { label: "Adres indiener",             value: awb65.addressPresent },
-    { label: "Dagtekening",                value: awb65.datePresent },
-    { label: "Ondertekening",              value: awb65.signaturePresent },
-    { label: "Omschrijving besluit",       value: awb65.decisionDescriptionPresent },
+    { label: "Naam indiener",                  value: awb65.namePresent },
+    { label: "Adres indiener",                 value: awb65.addressPresent },
+    { label: "Dagtekening",                    value: awb65.datePresent },
+    { label: "Ondertekening",                  value: awb65.signaturePresent },
+    { label: "Omschrijving besluit",           value: awb65.decisionDescriptionPresent },
     { label: "Gronden / omschrijving bezwaar", value: awb65.groundsPresent },
   ];
 
@@ -504,23 +569,23 @@ function DocumentPreview({ docType, docText, copied, onTextChange, onCopy, onSav
   const title = docType === "ontvangst" ? "Ontvangstbevestiging" : "Ontvangstbevestiging met herstelverzuim";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden pb-6">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-800">{title}</h2>
         <button onClick={onBack} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          ← Terug
+          ← Terug naar controle
         </button>
       </div>
       <div className="px-5 pt-4">
         <textarea
           className="w-full text-xs font-mono text-gray-700 border border-gray-200 rounded-xl p-3 resize-y focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-300 transition-all bg-gray-50"
-          rows={16}
+          rows={18}
           value={docText}
           onChange={(e) => onTextChange(e.target.value)}
         />
         <p className="text-xs text-gray-400 mt-1.5">Tekst is bewerkbaar — pas aan voor opslaan of kopiëren.</p>
       </div>
-      <div className="px-5 pt-4 flex gap-3">
+      <div className="px-5 pt-4 pb-5 flex gap-3">
         <button
           onClick={onCopy}
           className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition-all"
