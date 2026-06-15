@@ -17,11 +17,11 @@ const FASE_ICONS: Record<string, JSX.Element> = {
 };
 
 const FASE_TABS = [
-  { key: "Intake",       label: "Intake",                bg: "bg-blue-500",    pill: "bg-blue-600 text-white",    inactive: "text-gray-600 hover:bg-blue-50 hover:text-blue-700"    },
-  { key: "Informeel",   label: "Inform. afhandeling",  bg: "bg-orange-500",  pill: "bg-orange-500 text-white",  inactive: "text-gray-600 hover:bg-orange-50 hover:text-orange-700"  },
-  { key: "Hoorzitting", label: "Hoorzitting",           bg: "bg-purple-500",  pill: "bg-purple-600 text-white",  inactive: "text-gray-600 hover:bg-purple-50 hover:text-purple-700"  },
-  { key: "Advies",      label: "Advies",                bg: "bg-emerald-500", pill: "bg-emerald-600 text-white", inactive: "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700" },
-  { key: "Afronding",   label: "Afronding",             bg: "bg-slate-500",   pill: "bg-slate-600 text-white",   inactive: "text-gray-600 hover:bg-slate-50 hover:text-slate-700"   },
+  { key: "Intake",       label: "Intake",                bg: "bg-blue-500",    pill: "bg-blue-600 text-white",    inactive: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"        },
+  { key: "Informeel",   label: "Inform. afhandeling",  bg: "bg-orange-500",  pill: "bg-orange-500 text-white",  inactive: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"  },
+  { key: "Hoorzitting", label: "Hoorzitting",           bg: "bg-purple-500",  pill: "bg-purple-600 text-white",  inactive: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"  },
+  { key: "Advies",      label: "Advies",                bg: "bg-emerald-500", pill: "bg-emerald-600 text-white", inactive: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
+  { key: "Afronding",   label: "Afronding",             bg: "bg-slate-500",   pill: "bg-slate-600 text-white",   inactive: "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"    },
 ];
 
 const FASE_STEPS = ["Intake", "Informeel", "Hoorzitting", "Advies", "Afronding"];
@@ -102,7 +102,7 @@ function DashboardContent() {
     <div className="flex flex-col h-screen overflow-hidden">
 
       {/* ── Top header ─────────────────────────────────────────────────── */}
-      <header className="flex items-center h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 z-20 flex-shrink-0 px-4 gap-3 shadow-sm">
+      <header className="flex items-center h-16 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 z-20 flex-shrink-0 px-4 gap-3 shadow-sm">
 
         {/* Logo — matches sidebar width */}
         <div className="flex items-center gap-2.5 flex-shrink-0 w-52">
@@ -120,18 +120,18 @@ function DashboardContent() {
               <button
                 key={tab.key}
                 onClick={() => { setFaseFilter(active ? "Alle" : tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 border active:scale-[0.96] ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border active:scale-[0.96] ${
                   active
-                    ? `${tab.pill} border-transparent shadow-md`
-                    : `bg-white ${tab.inactive} border-gray-200 hover:shadow-sm`
+                    ? `${tab.pill} border-transparent shadow-lg`
+                    : `${tab.inactive} shadow-sm`
                 }`}
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                   {FASE_ICONS[tab.key]}
                 </svg>
                 {tab.label}
-                <span className={`ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  active ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+                <span className={`ml-0.5 text-xs font-bold min-w-[22px] h-[22px] flex items-center justify-center rounded-full ${
+                  active ? "bg-white/30 text-white" : "bg-white text-gray-700 shadow-sm"
                 }`}>{count}</span>
               </button>
             );
