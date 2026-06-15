@@ -773,20 +773,17 @@ Commissie Bezwaarschriften`;
           <DeadlineCard label="Beslistermijn" dateStr={zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken} />
         </div>
 
-        {/* Second row: dates */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Datum ontvangst", value: formatDate(zaak.datumOntvangst) },
-            { label: "Datum besluit",   value: formatDate(zaak.datumBesluit)   },
-            { label: "Hoorzitting",     value: formatDate(zaak.datumHoorzitting) },
-            ...(zaak.hersteltermijn ? [{ label: "Hersteltermijn", value: formatDate(zaak.hersteltermijn) }] : []),
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-white rounded-2xl border border-gray-100 p-3.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
-              <p className="text-sm font-semibold text-gray-800">{value || "—"}</p>
-            </div>
-          ))}
+        {/* Beschikbare acties */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
+          <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
         </div>
+
+        {/* Phase-specific content */}
+        <PhaseContent zaak={zaak} onUpdate={applyWorkflow} />
+
+        {/* Document generator */}
+        <DocumentGenerator zaak={zaak} onUpdate={applyWorkflow} />
 
         {/* Volgende actie */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
@@ -805,18 +802,6 @@ Commissie Bezwaarschriften`;
             </div>
           </div>
         </div>
-
-        {/* Beschikbare acties */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
-          <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
-        </div>
-
-        {/* Phase-specific content */}
-        <PhaseContent zaak={zaak} onUpdate={applyWorkflow} />
-
-        {/* Document generator */}
-        <DocumentGenerator zaak={zaak} onUpdate={applyWorkflow} />
 
         {/* Zaakgegevens collapsible */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
