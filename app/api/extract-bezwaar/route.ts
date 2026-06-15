@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (fileName.endsWith(".pdf")) {
-      const { default: pdfParse } = await import("pdf-parse/lib/pdf-parse.js");
+      const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
       const data = await pdfParse(buffer);
       extractedText = data.text;
     } else if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
