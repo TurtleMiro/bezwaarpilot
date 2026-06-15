@@ -121,8 +121,9 @@ function DashboardContent() {
         {/* Phase filter tabs — large blocks matching mockup */}
         <div className="hidden md:flex flex-1 self-stretch items-stretch gap-2 py-2">
           {FASE_TABS.map((tab) => {
-            const active = faseFilter === tab.key;
-            const count  = faseCounts[tab.key] ?? 0;
+            const active      = faseFilter === tab.key;
+            const isCaseFase  = !active && selectedCase?.fase === tab.key;
+            const count       = faseCounts[tab.key] ?? 0;
             return (
               <button
                 key={tab.key}
@@ -130,7 +131,9 @@ function DashboardContent() {
                 className={`flex-1 flex items-center gap-3 px-4 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] border ${
                   active
                     ? `${tab.pill} border-transparent shadow-lg`
-                    : `${tab.inactive} shadow-sm`
+                    : isCaseFase
+                      ? `${tab.inactive} shadow-md ring-2 ring-offset-1 ring-current`
+                      : `${tab.inactive} shadow-sm`
                 }`}
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-white/20" : "bg-white/80 shadow-sm"}`}>
@@ -138,7 +141,12 @@ function DashboardContent() {
                     {FASE_ICONS[tab.key]}
                   </svg>
                 </div>
-                <span className="leading-tight">{tab.label}</span>
+                <span className="leading-tight flex items-center gap-1.5">
+                  {tab.label}
+                  {isCaseFase && (
+                    <span className="inline-block w-2 h-2 rounded-full bg-current opacity-80 flex-shrink-0" title="Huidige fase van geselecteerde zaak" />
+                  )}
+                </span>
                 <span className={`ml-auto text-xs font-bold min-w-[24px] h-6 flex items-center justify-center rounded-full px-1.5 flex-shrink-0 ${
                   active ? "bg-white/30 text-white" : "bg-white text-gray-700 shadow-sm"
                 }`}>{count}</span>
