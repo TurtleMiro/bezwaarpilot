@@ -102,7 +102,7 @@ function DashboardContent() {
     <div className="flex flex-col h-screen overflow-hidden">
 
       {/* ── Top header ─────────────────────────────────────────────────── */}
-      <header className="flex items-center h-16 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 z-20 flex-shrink-0 px-4 gap-3 shadow-sm">
+      <header className="flex items-center h-20 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 z-20 flex-shrink-0 px-4 gap-3 shadow-sm">
 
         {/* Logo — matches sidebar width */}
         <div className="flex items-center gap-2.5 flex-shrink-0 w-52">
@@ -111,8 +111,8 @@ function DashboardContent() {
           <span className="font-bold text-gray-900 text-sm tracking-tight">BezwaarPilot</span>
         </div>
 
-        {/* Phase filter tabs */}
-        <div className="hidden md:flex flex-1 items-center gap-1.5">
+        {/* Phase filter tabs — large blocks matching mockup */}
+        <div className="hidden md:flex flex-1 self-stretch items-stretch gap-2 py-2">
           {FASE_TABS.map((tab) => {
             const active = faseFilter === tab.key;
             const count  = faseCounts[tab.key] ?? 0;
@@ -120,17 +120,19 @@ function DashboardContent() {
               <button
                 key={tab.key}
                 onClick={() => { setFaseFilter(active ? "Alle" : tab.key); setQuickFilter(null); setMobileShowDetail(false); }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border active:scale-[0.96] ${
+                className={`flex-1 flex items-center gap-3 px-4 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] border ${
                   active
                     ? `${tab.pill} border-transparent shadow-lg`
                     : `${tab.inactive} shadow-sm`
                 }`}
               >
-                <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  {FASE_ICONS[tab.key]}
-                </svg>
-                {tab.label}
-                <span className={`ml-0.5 text-xs font-bold min-w-[22px] h-[22px] flex items-center justify-center rounded-full ${
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-white/20" : "bg-white/80 shadow-sm"}`}>
+                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    {FASE_ICONS[tab.key]}
+                  </svg>
+                </div>
+                <span className="leading-tight">{tab.label}</span>
+                <span className={`ml-auto text-xs font-bold min-w-[24px] h-6 flex items-center justify-center rounded-full px-1.5 flex-shrink-0 ${
                   active ? "bg-white/30 text-white" : "bg-white text-gray-700 shadow-sm"
                 }`}>{count}</span>
               </button>
