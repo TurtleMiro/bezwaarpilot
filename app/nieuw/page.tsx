@@ -306,7 +306,8 @@ function NieuwBezwaarFlow() {
     };
 
     addCase(newCase);
-    router.push(`/zaak/${newCase.id}`);
+    localStorage.setItem("bp_select_case", newCase.id);
+    router.push("/");
   }
 
   function handleCopy() {

@@ -79,6 +79,13 @@ function DashboardContent() {
   });
 
   useEffect(() => {
+    const pending = localStorage.getItem("bp_select_case");
+    if (pending) {
+      localStorage.removeItem("bp_select_case");
+      setSelectedId(pending);
+      setMobileShowDetail(true);
+      return;
+    }
     if (cases.length > 0 && !selectedId) setSelectedId(cases[0].id);
   }, [cases.length]); // eslint-disable-line
 
