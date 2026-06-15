@@ -84,9 +84,9 @@ function NieuweZaakForm() {
 
       const next = { ...EMPTY_FORM, datumOntvangst: todayISO() };
 
-      function set(field: AiField, val: string | null | undefined) {
+      const set = (field: AiField, val: string | null | undefined) => {
         if (val) { (next as Record<string, string>)[field] = val; filled.add(field); }
-      }
+      };
 
       set("bezwaarmaker",        e.bezwaarmaker);
       set("gemachtigde",         e.gemachtigde);
