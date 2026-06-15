@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
-import { formatDate, isOverdue, isDueSoon, todayISO, addWeeks } from "@/lib/dateUtils";
+import { formatDate, isOverdue, isDueSoon, todayISO, addWeeks, addDays } from "@/lib/dateUtils";
 import { generateId } from "@/lib/store";
 import { signOut } from "next-auth/react";
 
@@ -454,7 +454,6 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
   const faseIndex           = FASE_STEPS.indexOf(zaak.fase);
   const currentFaseColor    = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
   const daysToActie         = daysUntil(zaak.actiedatum);
-  const daysToBeslistermijn = daysUntil(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken);
   const actieOverdue        = daysToActie !== null && daysToActie < 0;
   const actieSoon           = daysToActie !== null && daysToActie >= 0 && daysToActie <= 2;
 
@@ -604,37 +603,8 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
             </div>
           </div>
 
-          {/* Resterende tijd */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Resterende tijd</p>
-            {daysToActie !== null ? (
-              <>
-                <p className={`text-xl font-bold leading-tight ${actieOverdue ? "text-red-600" : actieSoon ? "text-amber-500" : "text-gray-900"}`}>
-                  {actieOverdue ? `${Math.abs(daysToActie)}d` : `${daysToActie}d`}
-                </p>
-                <p className={`text-[11px] mt-0.5 ${actieOverdue ? "text-red-500" : actieSoon ? "text-amber-500" : "text-gray-400"}`}>
-                  {actieOverdue ? "te laat" : "resterend"}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-300">—</p>
-            )}
-          </div>
-
-          {/* Beslistermijn */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Beslistermijn</p>
-            {daysToBeslistermijn !== null ? (
-              <>
-                <p className={`text-xl font-bold leading-tight ${daysToBeslistermijn < 14 ? "text-red-600" : daysToBeslistermijn < 30 ? "text-amber-500" : "text-gray-900"}`}>
-                  {daysToBeslistermijn}d
-                </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken)}</p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-300">—</p>
-            )}
-          </div>
+          <DeadlineCard label="Actiedatum" dateStr={zaak.actiedatum} />
+          <DeadlineCard label="Beslistermijn" dateStr={zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken} />
         </div>
 
         {/* Second row: dates */}
@@ -642,8 +612,8 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
           {[
             { label: "Datum ontvangst", value: formatDate(zaak.datumOntvangst) },
             { label: "Datum besluit",   value: formatDate(zaak.datumBesluit)   },
-            { label: "Actiedatum",      value: formatDate(zaak.actiedatum)     },
             { label: "Hoorzitting",     value: formatDate(zaak.datumHoorzitting) },
+            ...(zaak.hersteltermijn ? [{ label: "Hersteltermijn", value: formatDate(zaak.hersteltermijn) }] : []),
           ].map(({ label, value }) => (
             <div key={label} className="bg-white rounded-2xl border border-gray-100 p-3.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
@@ -675,6 +645,12 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
           <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
         </div>
+
+        {/* Phase-specific content */}
+        <PhaseContent zaak={zaak} onUpdate={applyWorkflow} />
+
+        {/* Document generator */}
+        <DocumentGenerator zaak={zaak} onUpdate={applyWorkflow} />
 
         {/* Zaakgegevens collapsible */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -928,6 +904,24 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     setPendingToolCall(null);
   }
 
+  function getRuleBasedResponse(msg: string): string | null {
+    const lower = msg.toLowerCase().trim();
+    if ((lower.includes("vat") && lower.includes("samen")) || lower === "samenvatting") {
+      return `📋 Zaaksamenvatting\n\nZaaknummer: ${zaak.zaaknummer}\nBezwaarmaker: ${zaak.bezwaarmaker}\nFase: ${zaak.fase}\nStatus: ${zaak.status || "In behandeling"}\n\nDatum besluit: ${formatDate(zaak.datumBesluit) || "—"}\nDatum ontvangst: ${formatDate(zaak.datumOntvangst) || "—"}\nBeslistermijn: ${formatDate(zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken) || "—"}\n\nVolgende actie: ${zaak.volgendeActie || "—"}\nActiedatum: ${formatDate(zaak.actiedatum) || "—"}${zaak.aantekeningen ? `\n\nAantekeningen:\n${zaak.aantekeningen.slice(0, 200)}${zaak.aantekeningen.length > 200 ? "..." : ""}` : ""}`;
+    }
+    if (lower.includes("volgende stap") || lower.includes("wat nu") || lower.includes("next step")) {
+      return `🔄 Volgende stap\n\nDe zaak bevindt zich in de fase "${zaak.fase}".\n\nVolgende actie: ${zaak.volgendeActie || "Geen volgende actie bekend"}\n\n${zaak.actiedatum ? `Actiedatum: ${formatDate(zaak.actiedatum)}` : ""}`;
+    }
+    if (lower.includes("deadline") || lower.includes("termijn") || lower.includes("beslistermijn")) {
+      const bt = zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken;
+      return `⏰ Termijnen\n\nBeslistermijn: ${formatDate(bt) || "Niet bekend"}\nActiedatum: ${formatDate(zaak.actiedatum) || "Niet bekend"}${zaak.hersteltermijn ? `\nHersteltermijn: ${formatDate(zaak.hersteltermijn)}` : ""}`;
+    }
+    if (lower.includes("fase") || lower.includes("status")) {
+      return `📍 Huidige fase: ${zaak.fase}\nStatus: ${zaak.status || "In behandeling"}\n\nVolgende actie: ${zaak.volgendeActie || "—"}`;
+    }
+    return null;
+  }
+
   async function sendToAI() {
     const msg = aiInput.trim();
     if (!msg || aiLoading) return;
@@ -935,6 +929,13 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     const updated = [...aiMessages, { role: "user" as const, text: msg }];
     setAiMessages(updated);
     setAiInput("");
+
+    const localReply = getRuleBasedResponse(msg);
+    if (localReply) {
+      setAiMessages([...updated, { role: "ai", text: localReply }]);
+      return;
+    }
+
     setAiLoading(true);
     try {
       const res = await fetch("/api/ai", {
@@ -1356,33 +1357,376 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   );
 }
 
+// ─── Document Generator ───────────────────────────────────────────────────────
+
+type DocType = "ontvangstbevestiging" | "herstelverzuimbrief" | "reminder_vakafdeling" | "verzoek_intrekking" | "uitnodiging_hoorzitting" | "conceptadvies";
+
+function generateDocumentText(type: DocType, zaak: Case): string {
+  switch (type) {
+    case "ontvangstbevestiging":
+      return `Geachte heer, mevrouw,\n\nUw bezwaarschrift is in goede orde ontvangen. Uw bezwaarschrift is gericht tegen het besluit van ${formatDate(zaak.datumBesluit)}, inhoudende ${zaak.omschrijvingBesluit || "[omschrijving besluit]"}.\n\nUw bezwaarschrift is voor behandeling in handen gesteld van de algemene commissie bezwaarschriften.\n\nOp grond van artikel 7:10, eerste lid, van de Algemene wet bestuursrecht dient op uw bezwaarschrift binnen 12 weken te worden beslist. De beslissing op uw bezwaarschrift wordt op grond van artikel 7:10, derde lid, van de Algemene wet bestuursrecht voor ten hoogste zes weken verdaagd.\n\nU ontvangt te zijner tijd nadere informatie over het verdere verloop van de bezwaarprocedure.\n\nMet vriendelijke groet,\n\n[Naam secretaris]\nCommissie Bezwaarschriften`;
+    case "herstelverzuimbrief":
+      return `Geachte heer, mevrouw,\n\nUw bezwaarschrift is ontvangen. Het bezwaarschrift voldoet op dit moment niet aan de vereisten van artikel 6:5 van de Algemene wet bestuursrecht.\n\nHet volgende gebrek is geconstateerd:\n[Geef hier het specifieke gebrek aan]\n\nIk bied u de gelegenheid dit gebrek binnen twee weken na verzending van deze brief te herstellen. Indien u het gebrek niet binnen de gestelde termijn herstelt, kan uw bezwaarschrift niet-ontvankelijk worden verklaard.\n\nMet vriendelijke groet,\n\n[Naam secretaris]\nCommissie Bezwaarschriften`;
+    case "reminder_vakafdeling":
+      return `Beste collega,\n\nIk wil graag informeren naar de stand van zaken van de informele afhandeling in zaak ${zaak.zaaknummer} van ${zaak.bezwaarmaker}.\n\nKun je aangeven of informele afhandeling mogelijk is of inmiddels is geslaagd?\n\nMet vriendelijke groet,\n\n[Naam secretaris]\nCommissie Bezwaarschriften`;
+    case "verzoek_intrekking":
+      return `Geachte heer, mevrouw,\n\nIk heb begrepen dat er mogelijk overeenstemming is bereikt over de informele afhandeling van uw bezwaar.\n\nIndien u uw bezwaar niet langer wenst voort te zetten, verzoek ik u dit schriftelijk te bevestigen door uw bezwaar in te trekken.\n\nMet vriendelijke groet,\n\n[Naam secretaris]\nCommissie Bezwaarschriften`;
+    case "uitnodiging_hoorzitting":
+      return `Geachte heer, mevrouw,\n\nHierbij nodig ik u uit voor de hoorzitting van de algemene commissie bezwaarschriften.\n\nDatum: ${formatDate(zaak.datumHoorzitting) || "[datum in te vullen]"}\nTijdstip: ${zaak.datumHoorzittingTijd || "[tijdstip in te vullen]"}\nLocatie: ${zaak.locatieHoorzitting || "[locatie in te vullen]"}\n\nTijdens de hoorzitting krijgt u de gelegenheid uw bezwaren mondeling toe te lichten.\n\nMet vriendelijke groet,\n\n[Naam secretaris]\nCommissie Bezwaarschriften`;
+    case "conceptadvies":
+      return `CONCEPTADVIES\nCommissie Bezwaarschriften\n\nZaaknummer: ${zaak.zaaknummer}\nBezwaarmaker: ${zaak.bezwaarmaker}\nDatum advies: ${formatDate(todayISO())}\n\n1. INLEIDING\n\nOp ${formatDate(zaak.datumOntvangst)} heeft de commissie een bezwaarschrift ontvangen van ${zaak.bezwaarmaker}. Het bezwaar is gericht tegen het besluit van ${formatDate(zaak.datumBesluit)}.\n\n2. PROCEDUREVERLOOP\n\nHet bezwaarschrift is op ${formatDate(zaak.datumOntvangst)} ontvangen. ${zaak.datumHoorzitting ? `Op ${formatDate(zaak.datumHoorzitting)} heeft een hoorzitting plaatsgevonden.` : "Er heeft nog geen hoorzitting plaatsgevonden."}\n\n3. ONTVANKELIJKHEID\n\n[De commissie dient te beoordelen of het bezwaarschrift tijdig is ingediend en aan de formele vereisten voldoet.]\n\nDe bezwaartermijn eindigde op ${formatDate(zaak.einddatumBezwaartermijn) || "[datum]"}. Het bezwaarschrift is ${zaak.datumOntvangst && zaak.einddatumBezwaartermijn && zaak.datumOntvangst <= zaak.einddatumBezwaartermijn ? "tijdig" : "[tijdig/te laat]"} ingediend.\n\n[Verdere inhoudelijke beoordeling dient door de jurist te worden ingevuld.]`;
+  }
+}
+
+function DocumentGenerator({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  const [openDoc, setOpenDoc] = useState<DocType | null>(null);
+  const [texts, setTexts] = useState<Partial<Record<DocType, string>>>({});
+  const [copied, setCopied] = useState<DocType | null>(null);
+  const [saved, setSaved] = useState<DocType | null>(null);
+
+  const docs: { key: DocType; label: string }[] = [
+    { key: "ontvangstbevestiging",    label: "Ontvangstbevestiging" },
+    { key: "herstelverzuimbrief",     label: "Herstelverzuimbrief" },
+    { key: "reminder_vakafdeling",    label: "Reminder vakafdeling" },
+    { key: "verzoek_intrekking",      label: "Verzoek intrekking bezwaar" },
+    { key: "uitnodiging_hoorzitting", label: "Uitnodiging hoorzitting" },
+    { key: "conceptadvies",           label: "Conceptadvies" },
+  ];
+
+  function handleGenerate(key: DocType) {
+    setTexts((prev) => ({ ...prev, [key]: generateDocumentText(key, zaak) }));
+    setOpenDoc(key);
+  }
+
+  function handleCopy(key: DocType) {
+    navigator.clipboard.writeText(texts[key] ?? "");
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  function handleSave(key: DocType) {
+    onUpdate({ savedDocuments: { ...(zaak.savedDocuments ?? {}), [key]: texts[key] ?? "" } });
+    setSaved(key);
+    setTimeout(() => setSaved(null), 2000);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none">
+            <path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M9 2v3h3M6 9h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          <span className="text-sm font-semibold text-gray-700">Documentgenerator</span>
+        </div>
+        {openDoc && <button onClick={() => setOpenDoc(null)} className="text-xs text-gray-400 hover:text-gray-600">← Terug</button>}
+      </div>
+      {!openDoc ? (
+        <div className="p-4 grid grid-cols-2 gap-2">
+          {docs.map(({ key, label }) => (
+            <button key={key} onClick={() => handleGenerate(key)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all text-left">
+              <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" viewBox="0 0 16 16" fill="none">
+                <path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
+              </svg>
+              {label}
+              {zaak.savedDocuments?.[key] && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-500">{docs.find(d => d.key === openDoc)?.label}</p>
+          <textarea
+            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y bg-gray-50 leading-relaxed"
+            rows={14}
+            value={texts[openDoc] ?? ""}
+            onChange={(e) => setTexts((prev) => ({ ...prev, [openDoc!]: e.target.value }))}
+          />
+          <div className="flex gap-2">
+            <button onClick={() => handleCopy(openDoc)}
+              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm ${copied === openDoc ? "bg-emerald-600 text-white" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+              {copied === openDoc ? "✓ Gekopieerd!" : "Tekst kopiëren"}
+            </button>
+            <button onClick={() => handleSave(openDoc)}
+              className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${saved === openDoc ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}>
+              {saved === openDoc ? "✓ Opgeslagen!" : "Opslaan in zaak"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Phase-specific content ───────────────────────────────────────────────────
+
+function PhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  if (zaak.fase === "Intake") return <IntakePhaseContent zaak={zaak} onUpdate={onUpdate} />;
+  if (zaak.fase === "Hoorzitting" || zaak.fase === "Zitting") return <HoorzittingPhaseContent zaak={zaak} onUpdate={onUpdate} />;
+  if (zaak.fase === "Advies") return <AdviesPhaseContent zaak={zaak} onUpdate={onUpdate} />;
+  if (zaak.fase === "Afronding") return <AfrondingPhaseContent zaak={zaak} onUpdate={onUpdate} />;
+  return null;
+}
+
+function IntakePhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [showCard, setShowCard] = useState(!!zaak.intakeKaartGegenereerd);
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) setUploadedFile(file.name);
+  }
+
+  function generateIntakeCard() {
+    onUpdate({
+      intakeKaartGegenereerd: true,
+      grondenAanwezig: zaak.grondenAanwezig ?? "onbekend",
+      ondertekeningAanwezig: zaak.ondertekeningAanwezig ?? "onbekend",
+      adresAanwezig: zaak.adresAanwezig ?? "onbekend",
+      dagtekeningAanwezig: zaak.dagtekeningAanwezig ?? "onbekend",
+    });
+    setShowCard(true);
+  }
+
+  const requiredFieldsComplete =
+    !!zaak.bezwaarmaker && !!zaak.datumBesluit && !!zaak.datumOntvangst &&
+    zaak.grondenAanwezig === "ja" && zaak.ondertekeningAanwezig === "ja" &&
+    zaak.adresAanwezig === "ja" && zaak.dagtekeningAanwezig === "ja";
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Documenten uploaden</p>
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 w-full h-16 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-all px-4">
+            <svg className="w-5 h-5 text-gray-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <span className="text-xs text-gray-400">{uploadedFile ?? zaak.uploadedBezwaarFileName ?? "Klik om bezwaarschrift te uploaden (PDF/DOCX)"}</span>
+            <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx" />
+          </label>
+          <button onClick={generateIntakeCard} disabled={!uploadedFile && !zaak.uploadedBezwaarFileName}
+            className="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            {zaak.intakeKaartGegenereerd ? "Intakekaart vernieuwen" : "Intakekaart genereren (mock)"}
+          </button>
+        </div>
+      </div>
+
+      {(showCard || zaak.intakeKaartGegenereerd) && (
+        <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">Intakekaart</p>
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Mock extractie</span>
+          </div>
+          <div className="space-y-1">
+            <IntakeField label="Bezwaarmaker" value={zaak.bezwaarmaker} onEdit={(v) => onUpdate({ bezwaarmaker: v })} />
+            <IntakeField label="Gemachtigde" value={zaak.gemachtigde} onEdit={(v) => onUpdate({ gemachtigde: v })} />
+            <IntakeField label="Datum ontvangst" value={formatDate(zaak.datumOntvangst)} uncertain={!zaak.datumOntvangst} />
+            <IntakeField label="Datum besluit" value={formatDate(zaak.datumBesluit)} uncertain={!zaak.datumBesluit} />
+            <IntakeField label="Omschrijving besluit" value={zaak.omschrijvingBesluit} onEdit={(v) => onUpdate({ omschrijvingBesluit: v })} uncertain={!zaak.omschrijvingBesluit} />
+            <IntakeField label="Type besluit" value={zaak.typeBesluit} onEdit={(v) => onUpdate({ typeBesluit: v })} uncertain={!zaak.typeBesluit} />
+            <IntakeCheckField label="Gronden aanwezig" value={zaak.grondenAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ grondenAanwezig: v as "ja"|"nee"|"onbekend" })} />
+            <IntakeCheckField label="Ondertekening aanwezig" value={zaak.ondertekeningAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ ondertekeningAanwezig: v as "ja"|"nee"|"onbekend" })} />
+            <IntakeCheckField label="Adres aanwezig" value={zaak.adresAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ adresAanwezig: v as "ja"|"nee"|"onbekend" })} />
+            <IntakeCheckField label="Dagtekening aanwezig" value={zaak.dagtekeningAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ dagtekeningAanwezig: v as "ja"|"nee"|"onbekend" })} />
+          </div>
+          <div className="mt-3 pt-3 border-t border-blue-100">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Aanbevolen actie</p>
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${requiredFieldsComplete ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+              <span>{requiredFieldsComplete ? "✓" : "⚠"}</span>
+              {requiredFieldsComplete ? "Ontvangstbevestiging genereren" : "Herstelverzuimbrief genereren"}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IntakeField({ label, value, uncertain, onEdit }: { label: string; value?: string; uncertain?: boolean; onEdit?: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? "");
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+      <span className="text-xs text-gray-500 flex-shrink-0 w-40">{label}</span>
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {editing ? (
+          <>
+            <input autoFocus className="flex-1 text-xs border border-blue-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400" value={val} onChange={(e) => setVal(e.target.value)} />
+            <button onClick={() => { onEdit?.(val); setEditing(false); }} className="text-[10px] text-blue-600 font-semibold hover:text-blue-800">OK</button>
+          </>
+        ) : (
+          <>
+            {uncertain && <span className="text-amber-500 flex-shrink-0">❗</span>}
+            <span className={`text-xs font-medium truncate ${uncertain || !value ? "text-gray-400 italic" : "text-gray-800"}`}>{value || "Onbekend"}</span>
+            {onEdit && <button onClick={() => setEditing(true)} className="text-[10px] text-gray-400 hover:text-blue-500 flex-shrink-0 ml-1">✏️</button>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IntakeCheckField({ label, value, onChange }: { label: string; value: "ja"|"nee"|"onbekend"; onChange: (v: string) => void }) {
+  const color = value === "ja" ? "text-emerald-600" : value === "nee" ? "text-red-600" : "text-amber-500";
+  const icon  = value === "ja" ? "✓" : value === "nee" ? "✗" : "❗";
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50">
+      <span className="text-xs text-gray-500 flex-shrink-0 w-40">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`text-xs font-semibold ${color}`}>{icon} {value}</span>
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="text-[10px] border border-gray-200 rounded-lg px-1 py-0.5 focus:outline-none text-gray-600">
+          <option value="ja">Ja</option>
+          <option value="nee">Nee</option>
+          <option value="onbekend">Onbekend</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+function HoorzittingPhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Hoorzitting details</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <EditableField label="Datum hoorzitting" value={zaak.datumHoorzitting} type="date" onChange={(v) => onUpdate({ datumHoorzitting: v })} />
+        <EditableField label="Tijdstip" value={zaak.datumHoorzittingTijd ?? ""} onChange={(v) => onUpdate({ datumHoorzittingTijd: v })} />
+        <EditableField label="Locatie" value={zaak.locatieHoorzitting ?? ""} onChange={(v) => onUpdate({ locatieHoorzitting: v })} />
+        <div className="sm:col-span-2 grid grid-cols-3 gap-2">
+          {([
+            { key: "dossierCompleet" as keyof Case,       label: "Dossier compleet" },
+            { key: "stukkenGeanonimiseerd" as keyof Case, label: "Stukken geanonimiseerd" },
+            { key: "partijenUitgenodigd" as keyof Case,   label: "Partijen uitgenodigd" },
+          ]).map(({ key, label }) => (
+            <div key={String(key)}>
+              <p className="text-xs font-medium text-gray-400 mb-1">{label}</p>
+              <select className="w-full rounded-xl border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                value={(zaak[key] as string) ?? ""}
+                onChange={(e) => onUpdate({ [key]: e.target.value } as Partial<Case>)}>
+                <option value="">—</option>
+                <option value="ja">Ja</option>
+                <option value="nee">Nee</option>
+              </select>
+            </div>
+          ))}
+        </div>
+        <div className="sm:col-span-2">
+          <p className="text-xs font-medium text-gray-400 mb-1.5">Hoorzitting notities</p>
+          <textarea className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[64px] resize-y"
+            value={zaak.hoorzittingNotities ?? ""} onChange={(e) => onUpdate({ hoorzittingNotities: e.target.value })} placeholder="Notities over de hoorzitting..." />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdviesPhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Advies details</p>
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-1.5">Adviesrichting</p>
+          <select className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            value={zaak.adviesRichting ?? ""} onChange={(e) => onUpdate({ adviesRichting: e.target.value })}>
+            <option value="">— Selecteer —</option>
+            <option value="gegrond">Gegrond</option>
+            <option value="ongegrond">Ongegrond</option>
+            <option value="niet-ontvankelijk">Niet-ontvankelijk</option>
+            <option value="gedeeltelijk-gegrond">Gedeeltelijk gegrond</option>
+          </select>
+        </div>
+        <EditableField label="Advies notities" value={zaak.adviesNotities ?? ""} onChange={(v) => onUpdate({ adviesNotities: v })} />
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-1.5">Conceptadvies tekst</p>
+          <textarea className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[80px] resize-y"
+            value={zaak.conceptAdviesTekst ?? ""} onChange={(e) => onUpdate({ conceptAdviesTekst: e.target.value })} placeholder="Concepttekst van het advies..." />
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-1.5">Feedback commissie</p>
+          <textarea className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[64px] resize-y"
+            value={zaak.commissieFeedback ?? ""} onChange={(e) => onUpdate({ commissieFeedback: e.target.value })} placeholder="Feedback van de commissie..." />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AfrondingPhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Afronding details</p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-medium text-gray-400 mb-1">Beslissing conform advies?</p>
+            <select className="w-full rounded-xl border border-gray-200 px-2 py-1.5 text-xs focus:outline-none"
+              value={zaak.beslissingConformAdvies ?? ""} onChange={(e) => onUpdate({ beslissingConformAdvies: e.target.value as "ja"|"nee" })}>
+              <option value="">—</option><option value="ja">Ja</option><option value="nee">Nee</option>
+            </select>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 mb-1">Contrair besluit?</p>
+            <select className="w-full rounded-xl border border-gray-200 px-2 py-1.5 text-xs focus:outline-none"
+              value={zaak.contrairBesluit ?? ""} onChange={(e) => onUpdate({ contrairBesluit: e.target.value as "ja"|"nee" })}>
+              <option value="">—</option><option value="ja">Ja</option><option value="nee">Nee</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-1.5">Afsluit notities</p>
+          <textarea className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[64px] resize-y"
+            value={zaak.afsluitNotities ?? ""} onChange={(e) => onUpdate({ afsluitNotities: e.target.value })} placeholder="Afsluitende notities..." />
+        </div>
+        {zaak.datumBeslissingOpBezwaar && (
+          <div className="bg-gray-50 rounded-xl p-3">
+            <p className="text-xs text-gray-400">Beslissing op bezwaar ontvangen op</p>
+            <p className="text-sm font-semibold text-gray-800">{formatDate(zaak.datumBeslissingOpBezwaar)}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Workflow actions ─────────────────────────────────────────────────────────
 
 type ActionDef = { label: string; variant: "green" | "red" | "blue"; updates: Partial<Case> };
 
 function getActionsForFase(fase: string): ActionDef[] {
   switch (fase) {
-    case "Intake":      return [
-      { label: "Ontvangstbevestiging verzonden", variant: "green", updates: { status: "Ontvangstbevestiging verzonden", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
-      { label: "Herstelverzuimbrief verzonden",  variant: "red",   updates: { status: "In afwachting herstel", volgendeActie: "Controleer hersteltermijn" } },
-      { label: "Herstel ontvangen",              variant: "blue",  updates: { status: "Herstel ontvangen", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
+    case "Intake": return [
+      { label: "Ontvangstbevestiging verzonden", variant: "green", updates: { status: "Ontvangstbevestiging verzonden", fase: "Informeel", verdaagd: "Ja", volgendeActie: "Procesdossier opvragen / informele afhandeling beoordelen" } },
+      { label: "Herstelverzuimbrief verzonden",  variant: "red",   updates: { status: "🔴 In afwachting herstel", fase: "Intake", hersteltermijn: addDays(todayISO(), 14), actiedatum: addDays(todayISO(), 14), volgendeActie: "Controleer hersteltermijn" } },
+      { label: "Herstel ontvangen",              variant: "blue",  updates: { status: "🟢 Herstel ontvangen", fase: "Informeel", volgendeActie: "Beoordeel informele afhandeling" } },
+      { label: "Geen herstel ontvangen",         variant: "red",   updates: { status: "🔴 Geen herstel ontvangen", fase: "Advies", volgendeActie: "Conceptadvies niet-ontvankelijk maken" } },
     ];
-    case "Informeel":   return [
-      { label: "Informeel afgerond",      variant: "green", updates: { status: "Informele afhandeling afgerond", volgendeActie: "Verzoek intrekking bezwaar versturen" } },
-      { label: "Informeel niet geslaagd", variant: "red",   updates: { status: "Zitting plannen", fase: "Zitting", volgendeActie: "Plan hoorzitting" } },
-      { label: "Zitting plannen",         variant: "blue",  updates: { fase: "Hoorzitting", volgendeActie: "Hoorzitting plannen" } },
+    case "Informeel": return [
+      { label: "Start informele afhandeling",          variant: "blue",  updates: { status: "🟠 In afwachting informele afhandeling", fase: "Informeel", volgendeActie: "Check vakafdeling", actiedatum: addDays(todayISO(), 14) } },
+      { label: "Reminder vakafdeling",                 variant: "blue",  updates: { volgendeActie: "Reminder vakafdeling verzonden / wacht op reactie", actiedatum: addDays(todayISO(), 7) } },
+      { label: "Informeel afgerond",                   variant: "green", updates: { status: "🟢 Informele afhandeling afgerond", fase: "Informeel", volgendeActie: "Verzoek intrekking bezwaar versturen" } },
+      { label: "Verzoek intrekking bezwaar versturen", variant: "blue",  updates: { status: "🟠 Wachten op intrekking", fase: "Informeel", volgendeActie: "Controleer of intrekking is ontvangen", actiedatum: addDays(todayISO(), 14) } },
+      { label: "Intrekking ontvangen",                 variant: "green", updates: { status: "⚫ Afgerond", fase: "Afronding", volgendeActie: "Zaak sluiten" } },
+      { label: "Geen intrekking ontvangen",            variant: "red",   updates: { status: "🔵 Zitting plannen", fase: "Hoorzitting", volgendeActie: "Plan hoorzitting" } },
+      { label: "Informeel niet geslaagd",              variant: "red",   updates: { status: "🔵 Zitting plannen", fase: "Hoorzitting", volgendeActie: "Plan hoorzitting" } },
     ];
     case "Zitting":
     case "Hoorzitting": return [
-      { label: "Zitting gepland",     variant: "green", updates: { status: "Zitting gepland", volgendeActie: "Uitnodigingen versturen" } },
-      { label: "Hoorzitting geweest", variant: "blue",  updates: { status: "Advies uitwerken", fase: "Advies", volgendeActie: "Conceptadvies maken" } },
+      { label: "Zitting gepland",         variant: "blue",  updates: { status: "🔵 Zitting gepland", fase: "Hoorzitting", volgendeActie: "Uitnodigingen versturen" } },
+      { label: "Uitnodigingen verzonden", variant: "blue",  updates: { status: "🔵 Uitnodigingen verzonden", fase: "Hoorzitting", volgendeActie: "Hoorzitting voorbereiden" } },
+      { label: "Hoorzitting geweest",     variant: "green", updates: { status: "🟣 Advies uitwerken", fase: "Advies", volgendeActie: "Conceptadvies maken" } },
     ];
-    case "Advies":      return [
-      { label: "Advies verzonden", variant: "green", updates: { status: "Advies verzonden", fase: "Afronding", adviesUitgebracht: "Ja", datumAdvies: todayISO(), volgendeActie: "Wachten op beslissing" } as Partial<Case> },
+    case "Advies": return [
+      { label: "Conceptadvies starten",        variant: "blue",  updates: { status: "🟣 Advies uitwerken", fase: "Advies", volgendeActie: "Conceptadvies delen met commissie" } },
+      { label: "Feedback commissie ontvangen", variant: "blue",  updates: { status: "🟣 Feedback verwerken", fase: "Advies", volgendeActie: "Definitief advies maken" } },
+      { label: "Advies verzonden",             variant: "green", updates: { status: "🟣 Advies verzonden", fase: "Afronding", adviesUitgebracht: "Ja", datumAdvies: todayISO(), volgendeActie: "Wachten op beslissing op bezwaar" } as Partial<Case> },
     ];
-    case "Afronding":   return [
-      { label: "Beslissing ontvangen", variant: "green", updates: { beslissingOpBezwaar: "Ja" as const, datumBeslissingOpBezwaar: todayISO(), volgendeActie: "Zaak sluiten" } },
-      { label: "Zaak afgerond",        variant: "blue",  updates: { status: "Afgerond", volgendeActie: "Geen" } },
+    case "Afronding": return [
+      { label: "Beslissing op bezwaar ontvangen", variant: "green", updates: { beslissingOpBezwaar: "Ja" as const, datumBeslissingOpBezwaar: todayISO(), volgendeActie: "Zaak sluiten" } },
+      { label: "Zaak afgerond",                   variant: "blue",  updates: { status: "⚫ Afgerond", fase: "Afronding", volgendeActie: "Geen" } },
     ];
     default: return [];
   }
@@ -1429,6 +1773,35 @@ function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdat
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function DeadlineCard({ label, dateStr }: { label: string; dateStr: string }) {
+  if (!dateStr) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+        <p className="text-sm font-semibold text-gray-400">Geen termijn bekend</p>
+      </div>
+    );
+  }
+  const today  = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+  const diff   = Math.round((target.getTime() - today.getTime()) / 86400000);
+
+  let text = "";
+  let colorCls = "";
+  if (diff === 0)      { text = "Vandaag";                    colorCls = "text-orange-600"; }
+  else if (diff < 0)  { text = `${Math.abs(diff)} dagen te laat`; colorCls = "text-red-600"; }
+  else if (diff <= 7) { text = `Nog ${diff} dagen`;           colorCls = "text-orange-500"; }
+  else                { text = `Nog ${diff} dagen`;           colorCls = "text-gray-900"; }
+
+  return (
+    <div className={`bg-white rounded-2xl border p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${diff < 0 ? "border-red-200" : diff <= 7 ? "border-orange-200" : "border-gray-100"}`}>
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+      <p className={`text-xl font-bold leading-tight ${colorCls}`}>{text}</p>
+      <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(dateStr)}</p>
+    </div>
+  );
+}
 
 function FaseBadge({ fase, small, dark }: { fase: string; small?: boolean; dark?: boolean }) {
   const light: Record<string, string> = {

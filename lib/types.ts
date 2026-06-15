@@ -20,6 +20,35 @@ export interface Case {
   aantekeningen: string;
   uploadedBezwaarFileName?: string;
   generatedDocument?: string;
+  // Intake
+  gemachtigde?: string;
+  omschrijvingBesluit?: string;
+  typeBesluit?: string;
+  grondenAanwezig?: "ja" | "nee" | "onbekend";
+  ondertekeningAanwezig?: "ja" | "nee" | "onbekend";
+  adresAanwezig?: "ja" | "nee" | "onbekend";
+  dagtekeningAanwezig?: "ja" | "nee" | "onbekend";
+  intakeKaartGegenereerd?: boolean;
+  hersteltermijn?: string;
+  // Hoorzitting
+  datumHoorzittingTijd?: string;
+  locatieHoorzitting?: string;
+  dossierCompleet?: "ja" | "nee";
+  stukkenGeanonimiseerd?: "ja" | "nee";
+  partijenUitgenodigd?: "ja" | "nee";
+  hoorzittingNotities?: string;
+  // Advies
+  adviesRichting?: string;
+  adviesNotities?: string;
+  conceptAdviesTekst?: string;
+  commissieFeedback?: string;
+  definitiefAdviesTekst?: string;
+  // Afronding
+  beslissingConformAdvies?: "ja" | "nee";
+  contrairBesluit?: "ja" | "nee";
+  afsluitNotities?: string;
+  // Documents saved to case
+  savedDocuments?: Record<string, string>;
 }
 
 export type FaseFilter =

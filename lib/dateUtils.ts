@@ -1,3 +1,11 @@
+export function addDays(dateStr: string, days: number): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split("T")[0];
+}
+
 export function addWeeks(dateStr: string, weeks: number): string {
   if (!dateStr) return "";
   const date = new Date(dateStr);
