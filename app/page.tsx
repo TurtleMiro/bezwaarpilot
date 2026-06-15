@@ -1991,42 +1991,144 @@ function getActionsForFase(fase: string): ActionDef[] {
   }
 }
 
+const FASE_ORDER = ["Intake", "Informeel", "Hoorzitting", "Advies", "Afronding"] as const;
+const FASE_ROLLBACK: Record<string, Partial<Case>> = {
+  Informeel:  { fase: "Intake",      status: "Intake gestart",           volgendeActie: "Beoordeel bezwaarschrift" },
+  Hoorzitting:{ fase: "Informeel",   status: "Informele afhandeling",    volgendeActie: "Beoordeel informele afhandeling" },
+  Zitting:    { fase: "Informeel",   status: "Informele afhandeling",    volgendeActie: "Beoordeel informele afhandeling" },
+  Advies:     { fase: "Hoorzitting", status: "Zitting gepland",          volgendeActie: "Hoorzitting voorbereiden" },
+  Afronding:  { fase: "Advies",      status: "🟣 Advies uitwerken",      volgendeActie: "Conceptadvies maken" },
+};
+
 function WorkflowActions({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
   const actions = getActionsForFase(zaak.fase);
-  if (!actions.length) return <p className="text-xs text-gray-400">Geen acties beschikbaar.</p>;
+  const rollback = FASE_ROLLBACK[zaak.fase] ?? null;
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {actions.map((a, i) => <WorkflowActionButton key={i} action={a} onUpdate={onUpdate} />)}
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {actions.length > 0
+          ? actions.map((a, i) => <WorkflowActionButton key={i} action={a} currentFase={zaak.fase} onUpdate={onUpdate} />)
+          : <p className="text-xs text-gray-400">Geen acties beschikbaar.</p>
+        }
+      </div>
+
+      {rollback && (
+        <div className="pt-2 border-t border-gray-100">
+          <RollbackButton rollback={rollback} currentFase={zaak.fase} onUpdate={onUpdate} />
+        </div>
+      )}
     </div>
   );
 }
 
-function WorkflowActionButton({ action, onUpdate }: { action: ActionDef; onUpdate: (u: Partial<Case>) => void }) {
-  const [clicked, setClicked] = useState(false);
-  function handleClick() { onUpdate(action.updates); setClicked(true); setTimeout(() => setClicked(false), 2000); }
+function WorkflowActionButton({ action, currentFase, onUpdate }: { action: ActionDef; currentFase: string; onUpdate: (u: Partial<Case>) => void }) {
+  const [pending, setPending] = useState(false);
+  const [done, setDone] = useState(false);
+  const changesFase = !!action.updates.fase && action.updates.fase !== currentFase;
+
+  function handleClick() {
+    if (changesFase && !pending) { setPending(true); return; }
+    onUpdate(action.updates);
+    setPending(false);
+    setDone(true);
+    setTimeout(() => setDone(false), 2500);
+  }
 
   const styles = {
     green: { base: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300", iconBg: "bg-emerald-500" },
     red:   { base: "bg-red-50   border-red-200   text-red-700   hover:bg-red-100   hover:border-red-300",   iconBg: "bg-red-500"     },
     blue:  { base: "bg-blue-50  border-blue-200  text-blue-700  hover:bg-blue-100  hover:border-blue-300",  iconBg: "bg-blue-500"    },
   };
-  const icons: Record<ActionDef["variant"], JSX.Element> = {
-    green: <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg>,
-    red:   <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M2.72 2.72a.75.75 0 011.06 0L6 4.94l2.22-2.22a.75.75 0 111.06 1.06L7.06 6l2.22 2.22a.75.75 0 11-1.06 1.06L6 7.06 3.78 9.28a.75.75 0 01-1.06-1.06L4.94 6 2.72 3.78a.75.75 0 010-1.06z" /></svg>,
-    blue:  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M5 6a2 2 0 100-4 2 2 0 000 4zm-4 4c0-1.657 1.79-3 4-3s4 1.343 4 3H1zm8-3a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm1.5 3h-1.6c-.13-.37-.38-.71-.7-.97.36-.08.73-.03 1.3.47v.5z" /></svg>,
-  };
   const s = styles[action.variant];
+
+  if (done) {
+    return (
+      <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl border bg-emerald-50 border-emerald-300 text-emerald-700 text-xs font-semibold">
+        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-500">
+          <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg>
+        </div>
+        {action.label}
+      </div>
+    );
+  }
+
+  if (pending) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold">
+        <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" viewBox="0 0 14 14" fill="currentColor">
+          <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 9a.75.75 0 110-1.5.75.75 0 010 1.5zM7.5 7.25h-1L6.25 4h1.5L7.5 7.25z"/>
+        </svg>
+        <span className="flex-1">Naar fase <strong>{action.updates.fase}</strong>?</span>
+        <button onClick={handleClick} className="px-2.5 py-0.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors text-[11px] font-bold">
+          Bevestigen
+        </button>
+        <button onClick={() => setPending(false)} className="px-2 py-0.5 rounded-lg bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors text-[11px]">
+          Annuleren
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
       onClick={handleClick}
-      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.96] hover:-translate-y-0.5 hover:shadow-md ${
-        clicked ? "bg-emerald-50 border-emerald-300 text-emerald-700" : s.base
-      }`}
+      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.96] hover:-translate-y-0.5 hover:shadow-md ${s.base}`}
     >
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${clicked ? "bg-emerald-500" : s.iconBg}`}>
-        {clicked ? <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg> : icons[action.variant]}
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${s.iconBg}`}>
+        {action.variant === "green" && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path fillRule="evenodd" d="M10.28 3.28a.75.75 0 010 1.06l-5 5a.75.75 0 01-1.06 0l-2-2a.75.75 0 011.06-1.06L4.75 7.69l4.47-4.41a.75.75 0 011.06 0z" /></svg>}
+        {action.variant === "red"   && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M2.72 2.72a.75.75 0 011.06 0L6 4.94l2.22-2.22a.75.75 0 111.06 1.06L7.06 6l2.22 2.22a.75.75 0 11-1.06 1.06L6 7.06 3.78 9.28a.75.75 0 01-1.06-1.06L4.94 6 2.72 3.78a.75.75 0 010-1.06z" /></svg>}
+        {action.variant === "blue"  && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="currentColor"><path d="M5 6a2 2 0 100-4 2 2 0 000 4zm-4 4c0-1.657 1.79-3 4-3s4 1.343 4 3H1zm8-3a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm1.5 3h-1.6c-.13-.37-.38-.71-.7-.97.36-.08.73-.03 1.3.47v.5z" /></svg>}
       </div>
       {action.label}
+    </button>
+  );
+}
+
+function RollbackButton({ rollback, currentFase, onUpdate }: { rollback: Partial<Case>; currentFase: string; onUpdate: (u: Partial<Case>) => void }) {
+  const [pending, setPending] = useState(false);
+  const [done, setDone]       = useState(false);
+  const prevFase = rollback.fase as string;
+
+  function handleConfirm() {
+    onUpdate(rollback);
+    setPending(false);
+    setDone(true);
+    setTimeout(() => setDone(false), 2500);
+  }
+
+  if (done) {
+    return (
+      <p className="text-xs text-gray-400 italic">Fase teruggezet naar {prevFase}.</p>
+    );
+  }
+
+  if (pending) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-300 bg-gray-50 text-gray-700 text-xs font-medium">
+        <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" d="M9.5 2.5l-5 5 5 5" />
+        </svg>
+        <span className="flex-1">Terug naar <strong>{prevFase}</strong>?</span>
+        <button onClick={handleConfirm} className="px-2.5 py-0.5 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition-colors text-[11px] font-bold">
+          Bevestigen
+        </button>
+        <button onClick={() => setPending(false)} className="px-2 py-0.5 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors text-[11px]">
+          Annuleren
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPending(true)}
+      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+    >
+      <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" d="M9.5 2.5l-5 5 5 5" />
+      </svg>
+      Terug naar fase {prevFase}
     </button>
   );
 }
