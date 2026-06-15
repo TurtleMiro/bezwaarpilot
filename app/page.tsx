@@ -140,17 +140,8 @@ function DashboardContent() {
           })}
         </div>
 
-        {/* Right: new case + bell + avatar */}
+        {/* Right: bell + avatar */}
         <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-          <button
-            onClick={() => router.push("/nieuw")}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full hover:bg-blue-700 hover:shadow-md active:scale-[0.96] transition-all duration-150 shadow-sm"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-              <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Nieuwe zaak
-          </button>
           <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
             <svg className="w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
@@ -362,6 +353,11 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
   const [showFaseModal, setShowFaseModal]         = useState(false);
   const [showExportModal, setShowExportModal]     = useState(false);
   const [copied, setCopied]                       = useState(false);
+  const [uploadStatus, setUploadStatus]           = useState<"idle"|"loading"|"done"|"error">("idle");
+  const [uploadResult, setUploadResult]           = useState<Record<string, unknown> | null>(null);
+  const [uploadFileName, setUploadFileName]       = useState<string | null>(null);
+  const [showOntvangst, setShowOntvangst]         = useState(false);
+  const uploadInputRef                            = useRef<HTMLInputElement>(null);
   const meerActiesRef                             = useRef<HTMLDivElement>(null);
   const lastInitialRef                            = useRef(JSON.stringify(initialZaak));
 
@@ -397,6 +393,48 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
     onUpdate(updates);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  async function handleBezwaarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setUploadFileName(file.name);
+    setUploadStatus("loading");
+    setUploadResult(null);
+    setShowOntvangst(false);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/extract-bezwaar", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) { setUploadStatus("error"); return; }
+      setUploadResult(json.extracted);
+      setUploadStatus("done");
+    } catch {
+      setUploadStatus("error");
+    }
+  }
+
+  function buildOntvangstbrief(): string {
+    return `Aan: ${zaak.bezwaarmaker}
+Betreft: Bevestiging ontvangst bezwaarschrift – ${zaak.zaaknummer}
+Datum: ${formatDate(todayISO())}
+
+Geachte heer/mevrouw ${zaak.bezwaarmaker},
+
+Hierbij bevestigen wij de ontvangst van uw bezwaarschrift d.d. ${formatDate(zaak.datumOntvangst)}.
+
+Uw bezwaar heeft betrekking op het besluit van ${formatDate(zaak.datumBesluit) || "[datum besluit]"}.
+
+De beslistermijn bedraagt 12 weken vanaf het einde van de bezwaartermijn, derhalve tot ${formatDate(zaak.beslistermijn12Weken) || "[beslistermijn]"}.
+
+Wij zullen uw bezwaarschrift in behandeling nemen. Mocht u vragen hebben, neemt u dan contact met ons op.
+
+Met vriendelijke groet,
+
+[Naam secretaris]
+Commissie Bezwaarschriften`;
   }
 
   function handleFieldChange(field: keyof Case, value: string) {
@@ -583,6 +621,126 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
 
       {/* ── Content ────────────────────────────────────────────────── */}
       <div className="p-5 space-y-4">
+
+        {/* Bezwaarschrift uploaden */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3.5 h-3.5 text-blue-600" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 10.5v1.75A1.75 1.75 0 003.75 14h8.5A1.75 1.75 0 0014 12.25V10.5M8 2.5v7M5.5 5L8 2.5 10.5 5" />
+                </svg>
+              </div>
+              <span className="text-sm font-semibold text-gray-800">Bezwaarschrift controleren</span>
+              {uploadFileName && uploadStatus !== "loading" && (
+                <span className="text-xs text-gray-400 truncate max-w-[140px]">{uploadFileName}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {uploadStatus === "done" && (
+                <button
+                  onClick={() => setShowOntvangst(!showOntvangst)}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  {showOntvangst ? "Verberg brief" : "Ontvangstbevestiging"}
+                </button>
+              )}
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploadStatus === "loading"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 active:scale-[0.97] transition-all shadow-sm disabled:opacity-50"
+              >
+                {uploadStatus === "loading" ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" d="M7 1.5v7M4.5 4L7 1.5 9.5 4M2.5 10v1.5A1.5 1.5 0 004 13h6a1.5 1.5 0 001.5-1.5V10" />
+                  </svg>
+                )}
+                {uploadStatus === "loading" ? "Analyseren…" : uploadStatus === "done" ? "Opnieuw" : "Upload"}
+              </button>
+              <input ref={uploadInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleBezwaarUpload} />
+            </div>
+          </div>
+
+          {/* Results */}
+          {uploadStatus === "error" && (
+            <div className="px-4 pb-3">
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">Analyse mislukt — controleer het bestandstype (PDF of DOCX) en probeer opnieuw.</p>
+            </div>
+          )}
+
+          {uploadStatus === "done" && uploadResult && (() => {
+            const r = uploadResult as {
+              grondenAanwezig?: boolean; ondertekeningAanwezig?: boolean;
+              adresAanwezig?: boolean; dagtekeningAanwezig?: boolean;
+              ontbrekendeVelden?: string[]; opmerkingen?: string | null;
+            };
+            const checks = [
+              { label: "Naam & adres",         ok: r.adresAanwezig },
+              { label: "Dagtekening",           ok: r.dagtekeningAanwezig },
+              { label: "Gronden van bezwaar",   ok: r.grondenAanwezig },
+              { label: "Ondertekening",         ok: r.ondertekeningAanwezig },
+            ];
+            const missing = checks.filter(c => !c.ok);
+            const allOk = missing.length === 0;
+            return (
+              <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${allOk ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"}`}>
+                  {allOk
+                    ? <><svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="currentColor"><path fillRule="evenodd" d="M12.5 3.5a.75.75 0 010 1.06l-6.25 6.25a.75.75 0 01-1.06 0L2 7.56A.75.75 0 113.06 6.5l2.69 2.69L11.44 3.5a.75.75 0 011.06 0z"/></svg>Bezwaarschrift voldoet aan art. 6:5 Awb</>
+                    : <><svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="currentColor"><path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 9a.75.75 0 110-1.5.75.75 0 010 1.5zM7.5 7.25h-1L6.25 4h1.5L7.5 7.25z"/></svg>Ontbreekt: {missing.map(c => c.label).join(", ")}</>
+                  }
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {checks.map(c => (
+                    <div key={c.label} className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${c.ok ? "text-green-700 bg-green-50" : "text-red-600 bg-red-50"}`}>
+                      <span className="text-[10px]">{c.ok ? "✓" : "✗"}</span>
+                      {c.label}
+                    </div>
+                  ))}
+                </div>
+                {r.opmerkingen && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">{r.opmerkingen}</p>
+                )}
+
+                {/* Ontvangstbevestiging */}
+                {showOntvangst && (() => {
+                  const brief = buildOntvangstbrief();
+                  const mailBody = encodeURIComponent(brief);
+                  const mailSubject = encodeURIComponent(`Bevestiging ontvangst bezwaarschrift – ${zaak.zaaknummer}`);
+                  return (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+                        <span className="text-xs font-semibold text-gray-600">Ontvangstbevestiging</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigator.clipboard.writeText(brief)}
+                            className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            Kopieer
+                          </button>
+                          <a
+                            href={`mailto:?subject=${mailSubject}&body=${mailBody}`}
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            Open in Outlook →
+                          </a>
+                        </div>
+                      </div>
+                      <textarea
+                        readOnly
+                        className="w-full text-xs font-mono p-3 text-gray-700 bg-white resize-none focus:outline-none"
+                        rows={8}
+                        value={brief}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
+        </div>
 
         {/* Top info cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
