@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CasesProvider, useCases } from "@/lib/CasesContext";
 import { Case } from "@/lib/types";
@@ -140,6 +140,27 @@ Commissie Bezwaarschriften`;
 
 function DocumentViewer({ file, objectUrl }: { file: File; objectUrl: string }) {
   const isPdf = file.name.toLowerCase().endsWith(".pdf");
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [docxLoading, setDocxLoading] = useState(false);
+
+  const renderDocx = useCallback(async (f: File) => {
+    setDocxLoading(true);
+    setDocxHtml(null);
+    try {
+      const arrayBuffer = await f.arrayBuffer();
+      const mammoth = await import("mammoth");
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      setDocxHtml(result.value || "<p>Geen tekst gevonden in document.</p>");
+    } catch {
+      setDocxHtml("<p>Kon document niet weergeven.</p>");
+    } finally {
+      setDocxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isPdf) renderDocx(file);
+  }, [file, isPdf, renderDocx]);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col" style={{ minHeight: 560 }}>
@@ -162,16 +183,18 @@ function DocumentViewer({ file, objectUrl }: { file: File; objectUrl: string }) 
           title="Bezwaarschrift preview"
         />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
-            <svg className="w-7 h-7 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-700">{file.name}</p>
-            <p className="text-xs text-gray-400 mt-1">DOCX-bestanden kunnen niet worden weergegeven in de browser.<br />De tekst is geanalyseerd door de AI.</p>
-          </div>
+        <div className="flex-1 overflow-y-auto p-6" style={{ minHeight: 520 }}>
+          {docxLoading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+              <span className="w-6 h-6 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
+              <p className="text-xs text-gray-400">Document laden…</p>
+            </div>
+          ) : docxHtml ? (
+            <div
+              className="docx-render"
+              dangerouslySetInnerHTML={{ __html: docxHtml }}
+            />
+          ) : null}
         </div>
       )}
     </div>
