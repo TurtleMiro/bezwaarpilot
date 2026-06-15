@@ -361,8 +361,23 @@ function CaseDetailPanel({ zaak: initialZaak, onUpdate, onBack, onDelete, onDupl
   const [showExportModal, setShowExportModal]     = useState(false);
   const [copied, setCopied]                       = useState(false);
   const meerActiesRef                             = useRef<HTMLDivElement>(null);
+  const lastInitialRef                            = useRef(JSON.stringify(initialZaak));
 
-  useEffect(() => { setZaak(initialZaak); setShowZaakgegevens(false); setShowMeerActies(false); }, [initialZaak.id]); // eslint-disable-line
+  useEffect(() => {
+    setZaak(initialZaak);
+    lastInitialRef.current = JSON.stringify(initialZaak);
+    setShowZaakgegevens(false);
+    setShowMeerActies(false);
+  }, [initialZaak.id]); // eslint-disable-line
+
+  // Sync display when AI or another external source updates the case
+  useEffect(() => {
+    const str = JSON.stringify(initialZaak);
+    if (str !== lastInitialRef.current) {
+      lastInitialRef.current = str;
+      setZaak(initialZaak);
+    }
+  }, [initialZaak]); // eslint-disable-line
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -845,6 +860,8 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   const [pendingToolCall, setPendingToolCall]     = useState<{ name: string; args: Record<string, string> } | null>(null);
   const fileInputRef                              = useRef<HTMLInputElement>(null);
   const aiEndRef                                  = useRef<HTMLDivElement>(null);
+  const chatHistoriesRef                          = useRef<Map<string, { role: "user" | "ai"; text: string }[]>>(new Map());
+  const prevCaseIdRef                             = useRef<string>(zaak.id);
 
   function startResize(e: React.MouseEvent) {
     e.preventDefault();
@@ -865,8 +882,12 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     setActionChecked(false);
     setShowNoteForm(false); setNoteInput("");
     setShowCategorieForm(false); setCategorieSelected(null); setCategorieNote("");
-    setAiMessages([]); setAiInput(""); setPendingToolCall(null);
-  }, [zaak.id]);
+    // Save chat history for the case we're leaving, restore for the new one
+    chatHistoriesRef.current.set(prevCaseIdRef.current, aiMessages);
+    prevCaseIdRef.current = zaak.id;
+    setAiMessages(chatHistoriesRef.current.get(zaak.id) ?? []);
+    setAiInput(""); setPendingToolCall(null);
+  }, [zaak.id]); // eslint-disable-line
 
   useEffect(() => {
     aiEndRef.current?.scrollIntoView({ behavior: "smooth" });
