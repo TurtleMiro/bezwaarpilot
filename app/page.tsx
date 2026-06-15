@@ -1219,6 +1219,9 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
               </div>
               <p className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Voorgestelde wijziging</p>
             </div>
+            <p className="text-[11px] text-indigo-500 mb-2">
+              Zaak: <span className="font-semibold text-indigo-700">{zaak.zaaknummer}</span> — {zaak.bezwaarmaker}
+            </p>
 
             {pendingToolCall.name === "update_field" && (
               <div className="mb-2.5 bg-white rounded-xl border border-indigo-100 px-3 py-2">
