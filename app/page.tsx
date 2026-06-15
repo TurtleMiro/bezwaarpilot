@@ -1471,23 +1471,48 @@ function PhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Ca
 }
 
 function IntakePhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case>) => void }) {
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [showCard, setShowCard] = useState(!!zaak.intakeKaartGegenereerd);
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setUploadedFile(file.name);
+    if (file) { setSelectedFile(file); setAnalyzeError(null); }
   }
 
-  function generateIntakeCard() {
-    onUpdate({
-      intakeKaartGegenereerd: true,
-      grondenAanwezig: zaak.grondenAanwezig ?? "onbekend",
-      ondertekeningAanwezig: zaak.ondertekeningAanwezig ?? "onbekend",
-      adresAanwezig: zaak.adresAanwezig ?? "onbekend",
-      dagtekeningAanwezig: zaak.dagtekeningAanwezig ?? "onbekend",
-    });
-    setShowCard(true);
+  async function analyzeWithAI() {
+    if (!selectedFile) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      const res = await fetch("/api/extract-bezwaar", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok) { setAnalyzeError(json.error ?? "Analyse mislukt."); return; }
+
+      const e = json.extracted;
+      onUpdate({
+        uploadedBezwaarFileName: selectedFile.name,
+        intakeKaartGegenereerd: true,
+        bezwaarmaker:          e.bezwaarmaker     ?? zaak.bezwaarmaker,
+        gemachtigde:           e.gemachtigde      ?? zaak.gemachtigde,
+        omschrijvingBesluit:   e.omschrijvingBesluit ?? zaak.omschrijvingBesluit,
+        typeBesluit:           e.typeBesluit      ?? zaak.typeBesluit,
+        datumBesluit:          e.datumBesluit     ?? zaak.datumBesluit,
+        datumOntvangst:        e.datumBezwaarschrift ?? zaak.datumOntvangst,
+        grondenAanwezig:       e.grondenAanwezig       ? "ja" : "nee",
+        ondertekeningAanwezig: e.ondertekeningAanwezig ? "ja" : "nee",
+        adresAanwezig:         e.adresAanwezig         ? "ja" : "nee",
+        dagtekeningAanwezig:   e.dagtekeningAanwezig   ? "ja" : "nee",
+      });
+      setShowCard(true);
+    } catch {
+      setAnalyzeError("Verbindingsfout. Controleer uw internetverbinding.");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   const requiredFieldsComplete =
@@ -1495,43 +1520,102 @@ function IntakePhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Part
     zaak.grondenAanwezig === "ja" && zaak.ondertekeningAanwezig === "ja" &&
     zaak.adresAanwezig === "ja" && zaak.dagtekeningAanwezig === "ja";
 
+  const missingItems = [
+    !zaak.bezwaarmaker && "Naam bezwaarmaker",
+    !zaak.datumOntvangst && "Datum ontvangst",
+    !zaak.datumBesluit && "Datum besluit",
+    zaak.grondenAanwezig !== "ja" && "Gronden van bezwaar",
+    zaak.ondertekeningAanwezig !== "ja" && "Ondertekening",
+    zaak.adresAanwezig !== "ja" && "Adres indiener",
+    zaak.dagtekeningAanwezig !== "ja" && "Dagtekening",
+  ].filter(Boolean) as string[];
+
+  const hasFile = selectedFile || zaak.uploadedBezwaarFileName;
+
   return (
     <div className="space-y-4">
+      {/* Upload */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Documenten uploaden</p>
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Bezwaarschrift analyseren</p>
         <div className="space-y-3">
-          <label className="flex items-center gap-3 w-full h-16 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-all px-4">
-            <svg className="w-5 h-5 text-gray-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <label className={`flex items-center gap-3 w-full h-16 border-2 border-dashed rounded-xl cursor-pointer transition-all px-4 ${selectedFile ? "border-blue-300 bg-blue-50" : "border-gray-200 hover:bg-gray-50 hover:border-blue-300"}`}>
+            <svg className={`w-5 h-5 flex-shrink-0 ${selectedFile ? "text-blue-400" : "text-gray-300"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
-            <span className="text-xs text-gray-400">{uploadedFile ?? zaak.uploadedBezwaarFileName ?? "Klik om bezwaarschrift te uploaden (PDF/DOCX)"}</span>
+            <div className="min-w-0">
+              <p className={`text-xs font-medium truncate ${selectedFile ? "text-blue-700" : "text-gray-400"}`}>
+                {selectedFile?.name ?? zaak.uploadedBezwaarFileName ?? "Klik om bezwaarschrift te uploaden"}
+              </p>
+              <p className="text-[10px] text-gray-400">PDF of DOCX</p>
+            </div>
             <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx" />
           </label>
-          <button onClick={generateIntakeCard} disabled={!uploadedFile && !zaak.uploadedBezwaarFileName}
-            className="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-            {zaak.intakeKaartGegenereerd ? "Intakekaart vernieuwen" : "Intakekaart genereren (mock)"}
+
+          <button
+            onClick={analyzeWithAI}
+            disabled={!hasFile || analyzing}
+            className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {analyzing ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0" />
+                Analyseren met AI...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 1a4 4 0 00-4 4c0 1.49.82 2.79 2.03 3.47L5.5 14h5l-.53-5.53A4 4 0 008 1z" />
+                </svg>
+                {zaak.intakeKaartGegenereerd ? "Opnieuw analyseren" : "Analyseren met AI (Groq)"}
+              </>
+            )}
           </button>
+
+          {analyzeError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <p className="text-xs font-semibold text-red-700 mb-0.5">Analyse mislukt</p>
+              <p className="text-xs text-red-600">{analyzeError}</p>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Intake card */}
       {(showCard || zaak.intakeKaartGegenereerd) && (
         <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">Intakekaart</p>
-            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Mock extractie</span>
+            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">AI-extractie</span>
           </div>
+
+          {/* Missing fields alert */}
+          {missingItems.length > 0 && (
+            <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <p className="text-xs font-bold text-red-700 mb-1.5">⚠ Ontbrekende vereisten (art. 6:5 Awb)</p>
+              <ul className="space-y-0.5">
+                {missingItems.map((item) => (
+                  <li key={item} className="text-xs text-red-600 flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-1">
-            <IntakeField label="Bezwaarmaker" value={zaak.bezwaarmaker} onEdit={(v) => onUpdate({ bezwaarmaker: v })} />
-            <IntakeField label="Gemachtigde" value={zaak.gemachtigde} onEdit={(v) => onUpdate({ gemachtigde: v })} />
-            <IntakeField label="Datum ontvangst" value={formatDate(zaak.datumOntvangst)} uncertain={!zaak.datumOntvangst} />
-            <IntakeField label="Datum besluit" value={formatDate(zaak.datumBesluit)} uncertain={!zaak.datumBesluit} />
+            <IntakeField label="Bezwaarmaker"       value={zaak.bezwaarmaker}        onEdit={(v) => onUpdate({ bezwaarmaker: v })}       uncertain={!zaak.bezwaarmaker} />
+            <IntakeField label="Gemachtigde"         value={zaak.gemachtigde}         onEdit={(v) => onUpdate({ gemachtigde: v })} />
+            <IntakeField label="Datum ontvangst"     value={formatDate(zaak.datumOntvangst)}  uncertain={!zaak.datumOntvangst} />
+            <IntakeField label="Datum besluit"       value={formatDate(zaak.datumBesluit)}    uncertain={!zaak.datumBesluit} />
             <IntakeField label="Omschrijving besluit" value={zaak.omschrijvingBesluit} onEdit={(v) => onUpdate({ omschrijvingBesluit: v })} uncertain={!zaak.omschrijvingBesluit} />
-            <IntakeField label="Type besluit" value={zaak.typeBesluit} onEdit={(v) => onUpdate({ typeBesluit: v })} uncertain={!zaak.typeBesluit} />
-            <IntakeCheckField label="Gronden aanwezig" value={zaak.grondenAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ grondenAanwezig: v as "ja"|"nee"|"onbekend" })} />
+            <IntakeField label="Type besluit"        value={zaak.typeBesluit}         onEdit={(v) => onUpdate({ typeBesluit: v })}        uncertain={!zaak.typeBesluit} />
+            <IntakeCheckField label="Gronden aanwezig"       value={zaak.grondenAanwezig       ?? "onbekend"} onChange={(v) => onUpdate({ grondenAanwezig:       v as "ja"|"nee"|"onbekend" })} />
             <IntakeCheckField label="Ondertekening aanwezig" value={zaak.ondertekeningAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ ondertekeningAanwezig: v as "ja"|"nee"|"onbekend" })} />
-            <IntakeCheckField label="Adres aanwezig" value={zaak.adresAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ adresAanwezig: v as "ja"|"nee"|"onbekend" })} />
-            <IntakeCheckField label="Dagtekening aanwezig" value={zaak.dagtekeningAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ dagtekeningAanwezig: v as "ja"|"nee"|"onbekend" })} />
+            <IntakeCheckField label="Adres aanwezig"         value={zaak.adresAanwezig         ?? "onbekend"} onChange={(v) => onUpdate({ adresAanwezig:         v as "ja"|"nee"|"onbekend" })} />
+            <IntakeCheckField label="Dagtekening aanwezig"   value={zaak.dagtekeningAanwezig   ?? "onbekend"} onChange={(v) => onUpdate({ dagtekeningAanwezig:   v as "ja"|"nee"|"onbekend" })} />
           </div>
+
           <div className="mt-3 pt-3 border-t border-blue-100">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Aanbevolen actie</p>
             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${requiredFieldsComplete ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
