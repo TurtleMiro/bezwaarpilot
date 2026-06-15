@@ -773,18 +773,6 @@ Commissie Bezwaarschriften`;
           <DeadlineCard label="Beslistermijn" dateStr={zaak.beslistermijnNaVerdaging || zaak.beslistermijn12Weken} />
         </div>
 
-        {/* Beschikbare acties */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
-          <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
-        </div>
-
-        {/* Phase-specific content */}
-        <PhaseContent zaak={zaak} onUpdate={applyWorkflow} />
-
-        {/* Document generator */}
-        <DocumentGenerator zaak={zaak} onUpdate={applyWorkflow} />
-
         {/* Volgende actie */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Volgende actie</p>
@@ -802,6 +790,18 @@ Commissie Bezwaarschriften`;
             </div>
           </div>
         </div>
+
+        {/* Beschikbare acties */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Beschikbare acties</p>
+          <WorkflowActions zaak={zaak} onUpdate={applyWorkflow} />
+        </div>
+
+        {/* Phase-specific content */}
+        <PhaseContent zaak={zaak} onUpdate={applyWorkflow} />
+
+        {/* Document generator */}
+        <DocumentGenerator zaak={zaak} onUpdate={applyWorkflow} />
 
         {/* Zaakgegevens collapsible */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1731,17 +1731,41 @@ function IntakePhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Part
         </div>
       </div>
 
-      {/* Intake card */}
+      {/* Intake card — collapsible */}
       {(showCard || zaak.intakeKaartGegenereerd) && (
-        <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">Intakekaart</p>
-            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">AI-extractie</span>
-          </div>
+        <IntakeKaartCollapsible zaak={zaak} onUpdate={onUpdate} missingItems={missingItems} requiredFieldsComplete={requiredFieldsComplete} />
+      )}
+    </div>
+  );
+}
 
+function IntakeKaartCollapsible({ zaak, onUpdate, missingItems, requiredFieldsComplete }: {
+  zaak: Case; onUpdate: (u: Partial<Case>) => void; missingItems: string[]; requiredFieldsComplete: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">Intakekaart</p>
+          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">AI-extractie</span>
+          {missingItems.length > 0 && !open && (
+            <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">⚠ {missingItems.length} ontbreekt</span>
+          )}
+        </div>
+        <svg className={`w-4 h-4 text-blue-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-blue-50">
           {/* Missing fields alert */}
           {missingItems.length > 0 && (
-            <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+            <div className="mt-3 mb-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
               <p className="text-xs font-bold text-red-700 mb-1.5">⚠ Ontbrekende vereisten (art. 6:5 Awb)</p>
               <ul className="space-y-0.5">
                 {missingItems.map((item) => (
@@ -1754,13 +1778,13 @@ function IntakePhaseContent({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Part
             </div>
           )}
 
-          <div className="space-y-1">
-            <IntakeField label="Bezwaarmaker"       value={zaak.bezwaarmaker}        onEdit={(v) => onUpdate({ bezwaarmaker: v })}       uncertain={!zaak.bezwaarmaker} />
-            <IntakeField label="Gemachtigde"         value={zaak.gemachtigde}         onEdit={(v) => onUpdate({ gemachtigde: v })} />
-            <IntakeField label="Datum ontvangst"     value={formatDate(zaak.datumOntvangst)}  uncertain={!zaak.datumOntvangst} />
-            <IntakeField label="Datum besluit"       value={formatDate(zaak.datumBesluit)}    uncertain={!zaak.datumBesluit} />
-            <IntakeField label="Omschrijving besluit" value={zaak.omschrijvingBesluit} onEdit={(v) => onUpdate({ omschrijvingBesluit: v })} uncertain={!zaak.omschrijvingBesluit} />
-            <IntakeField label="Type besluit"        value={zaak.typeBesluit}         onEdit={(v) => onUpdate({ typeBesluit: v })}        uncertain={!zaak.typeBesluit} />
+          <div className="space-y-1 mt-3">
+            <IntakeField label="Bezwaarmaker"        value={zaak.bezwaarmaker}               onEdit={(v) => onUpdate({ bezwaarmaker: v })}        uncertain={!zaak.bezwaarmaker} />
+            <IntakeField label="Gemachtigde"          value={zaak.gemachtigde}                onEdit={(v) => onUpdate({ gemachtigde: v })} />
+            <IntakeField label="Datum ontvangst"      value={formatDate(zaak.datumOntvangst)} uncertain={!zaak.datumOntvangst} />
+            <IntakeField label="Datum besluit"        value={formatDate(zaak.datumBesluit)}   uncertain={!zaak.datumBesluit} />
+            <IntakeField label="Omschrijving besluit" value={zaak.omschrijvingBesluit}        onEdit={(v) => onUpdate({ omschrijvingBesluit: v })} uncertain={!zaak.omschrijvingBesluit} />
+            <IntakeField label="Type besluit"         value={zaak.typeBesluit}                onEdit={(v) => onUpdate({ typeBesluit: v })}         uncertain={!zaak.typeBesluit} />
             <IntakeCheckField label="Gronden aanwezig"       value={zaak.grondenAanwezig       ?? "onbekend"} onChange={(v) => onUpdate({ grondenAanwezig:       v as "ja"|"nee"|"onbekend" })} />
             <IntakeCheckField label="Ondertekening aanwezig" value={zaak.ondertekeningAanwezig ?? "onbekend"} onChange={(v) => onUpdate({ ondertekeningAanwezig: v as "ja"|"nee"|"onbekend" })} />
             <IntakeCheckField label="Adres aanwezig"         value={zaak.adresAanwezig         ?? "onbekend"} onChange={(v) => onUpdate({ adresAanwezig:         v as "ja"|"nee"|"onbekend" })} />
