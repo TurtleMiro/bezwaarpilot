@@ -176,11 +176,12 @@ function DashboardContent() {
               </span>
               <button
                 onClick={() => router.push("/nieuw")}
-                className="w-6 h-6 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-500 transition-colors shadow-sm whitespace-nowrap"
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 14 14" fill="none">
                   <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
+                Nieuw bezwaar
               </button>
             </div>
             <div className="relative">
