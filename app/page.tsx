@@ -842,6 +842,7 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
   const [aiInput, setAiInput]                     = useState("");
   const [aiLoading, setAiLoading]                 = useState(false);
   const [chatHeight, setChatHeight]               = useState(240);
+  const [pendingToolCall, setPendingToolCall]     = useState<{ name: string; args: Record<string, string> } | null>(null);
   const fileInputRef                              = useRef<HTMLInputElement>(null);
   const aiEndRef                                  = useRef<HTMLDivElement>(null);
 
@@ -864,7 +865,7 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
     setActionChecked(false);
     setShowNoteForm(false); setNoteInput("");
     setShowCategorieForm(false); setCategorieSelected(null); setCategorieNote("");
-    setAiMessages([]); setAiInput("");
+    setAiMessages([]); setAiInput(""); setPendingToolCall(null);
   }, [zaak.id]);
 
   useEffect(() => {
@@ -873,9 +874,41 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
 
   const currentFaseColor = FASE_COLORS[zaak.fase] ?? FASE_COLORS.Intake;
 
+  const FIELD_LABELS: Record<string, string> = {
+    actiedatum: "Actiedatum", volgendeActie: "Volgende actie", fase: "Fase",
+    datumHoorzitting: "Datum hoorzitting", datumBesluit: "Datum besluit",
+    datumOntvangst: "Datum ontvangst", status: "Status",
+  };
+
+  function formatPendingValue(field: string, value: string) {
+    if (field.toLowerCase().includes("datum") && /^\d{4}-\d{2}-\d{2}$/.test(value))
+      return formatDate(value);
+    return value;
+  }
+
+  function applyToolCall() {
+    if (!pendingToolCall) return;
+    const ts = new Date().toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    if (pendingToolCall.name === "add_note") {
+      const newNote = zaak.aantekeningen
+        ? `${zaak.aantekeningen}\n\n[${ts}] ${pendingToolCall.args.note}`
+        : `[${ts}] ${pendingToolCall.args.note}`;
+      const updated = { ...zaak, aantekeningen: newNote };
+      updateCase(updated);
+      onUpdate({ aantekeningen: newNote });
+    } else if (pendingToolCall.name === "update_field") {
+      const updated = { ...zaak, [pendingToolCall.args.field]: pendingToolCall.args.value };
+      updateCase(updated);
+      onUpdate({ [pendingToolCall.args.field]: pendingToolCall.args.value });
+    }
+    setAiMessages((prev) => [...prev, { role: "ai", text: "✓ Wijziging toegepast." }]);
+    setPendingToolCall(null);
+  }
+
   async function sendToAI() {
     const msg = aiInput.trim();
     if (!msg || aiLoading) return;
+    setPendingToolCall(null);
     const updated = [...aiMessages, { role: "user" as const, text: msg }];
     setAiMessages(updated);
     setAiInput("");
@@ -897,7 +930,12 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
         }),
       });
       const data = await res.json();
-      setAiMessages([...updated, { role: "ai", text: data.reply ?? data.error ?? "Er is een fout opgetreden." }]);
+      if (data.toolCall) {
+        setPendingToolCall(data.toolCall);
+        setAiMessages([...updated, { role: "ai", text: data.reply }]);
+      } else {
+        setAiMessages([...updated, { role: "ai", text: data.reply ?? data.error ?? "Er is een fout opgetreden." }]);
+      }
     } catch {
       setAiMessages([...updated, { role: "ai", text: "Verbindingsfout. Probeer het opnieuw." }]);
     } finally {
@@ -1169,6 +1207,53 @@ function RightPanel({ zaak, onUpdate }: { zaak: Case; onUpdate: (u: Partial<Case
           )}
           <div ref={aiEndRef} />
         </div>
+
+        {/* Confirmation card */}
+        {pendingToolCall && (
+          <div className="animate-fadeUp mx-3 mb-2 p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex-shrink-0">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-4 h-4 rounded-md bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
+                  <path d="M7.5 1.5L6 3 7 4l1.5-1.5a.7.7 0 000-1L8 1a.7.7 0 00-1 0zM5.5 3.5l-3 3L2 8.5l2-.5 3-3-1-1z" />
+                </svg>
+              </div>
+              <p className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Voorgestelde wijziging</p>
+            </div>
+
+            {pendingToolCall.name === "update_field" && (
+              <div className="mb-2.5 bg-white rounded-xl border border-indigo-100 px-3 py-2">
+                <p className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider mb-0.5">
+                  {FIELD_LABELS[pendingToolCall.args.field] ?? pendingToolCall.args.field}
+                </p>
+                <p className="text-xs font-semibold text-indigo-900">
+                  {formatPendingValue(pendingToolCall.args.field, pendingToolCall.args.value)}
+                </p>
+              </div>
+            )}
+
+            {pendingToolCall.name === "add_note" && (
+              <div className="mb-2.5 bg-white rounded-xl border border-indigo-100 px-3 py-2">
+                <p className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider mb-0.5">Toe te voegen notitie</p>
+                <p className="text-xs text-indigo-900 leading-relaxed line-clamp-3">{pendingToolCall.args.note}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={applyToolCall}
+                className="flex-1 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 active:scale-[0.97] transition-all shadow-sm"
+              >
+                Toepassen
+              </button>
+              <button
+                onClick={() => { setPendingToolCall(null); setAiMessages((prev) => [...prev, { role: "ai", text: "Wijziging geannuleerd." }]); }}
+                className="flex-1 py-1.5 rounded-xl border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-100 active:scale-[0.97] transition-all"
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Input */}
         <div className="px-3 py-2.5 border-t border-gray-100 flex-shrink-0">
